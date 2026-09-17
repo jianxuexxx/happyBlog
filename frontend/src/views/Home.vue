@@ -1,96 +1,63 @@
 <script setup lang="ts">
-// 骨架数据占位：真实数据来自 GET /api/home/recommend 与 /api/article/list（后端接入后替换）
-const recommendSkeletons = [1, 2, 3]
+import CarouselHero from '../components/home/CarouselHero.vue'
+import SidebarRecommended from '../components/home/SidebarRecommended.vue'
+import NoticeFloat from '../components/home/NoticeFloat.vue'
+
+// 骨架数据占位：真实数据来自 GET /api/article/list（后端接入后替换）
 const articleSkeletons = [1, 2, 3, 4, 5, 6]
 </script>
 
 <template>
   <div class="home">
-    <section class="hero">
-      <div class="hero-inner">
-        <h1 class="hero-title">我的博客</h1>
-        <p class="hero-subtitle">记录生活的倒影与诗意的代码</p>
-      </div>
-    </section>
+    <!-- 顶部大轮播图（拖拽展开） -->
+    <CarouselHero />
 
-    <section class="recommend">
-      <h2 class="section-title">推荐</h2>
-      <div class="recommend-grid">
-        <div
-          v-for="n in recommendSkeletons"
-          :key="n"
-          class="rec-card img-placeholder"
-          style="height: 160px"
-        >
-          推荐位 {{ n }}（图片占位）
-        </div>
-      </div>
-    </section>
+    <div class="home-body">
+      <!-- 左侧栏展位：推荐文章 -->
+      <aside class="home-sidebar">
+        <SidebarRecommended />
+      </aside>
 
-    <section class="article-list">
-      <h2 class="section-title">最新</h2>
-      <article v-for="n in articleSkeletons" :key="n" class="article-card card">
-        <div class="article-cover img-placeholder">封面占位</div>
-        <div class="article-body">
-          <h3>文章标题占位 {{ n }}</h3>
-          <p class="article-summary">摘要占位：接入后端后展示真实摘要。</p>
-          <div class="article-meta">
-            <span class="tag-chip">标签</span>
-            <span class="num">浏览 0 · 2026-09-17</span>
-          </div>
+      <!-- 主区：文章瀑布流 -->
+      <section class="home-main">
+        <h2 class="section-title">最新</h2>
+        <div class="article-list">
+          <article v-for="n in articleSkeletons" :key="n" class="article-card card">
+            <div class="article-cover img-placeholder">封面占位</div>
+            <div class="article-body">
+              <h3>文章标题占位 {{ n }}</h3>
+              <p class="article-summary">摘要占位：接入后端后展示真实摘要。</p>
+              <div class="article-meta">
+                <span class="tag-chip">标签</span>
+                <span class="num">浏览 0 · 2026-09-17</span>
+              </div>
+            </div>
+          </article>
         </div>
-      </article>
-    </section>
+      </section>
+    </div>
+
+    <!-- 右侧悬浮通知 -->
+    <NoticeFloat />
   </div>
 </template>
 
 <style scoped>
-.hero {
-  position: relative;
-  min-height: 280px;
-  border-radius: calc(var(--radius-card) * 2);
-  margin-bottom: 32px;
-  overflow: hidden;
-  /* hero-bg 占位：用户提供 hero-bg.jpg 后替换为 background-image 引用 */
-  background: linear-gradient(
-    135deg,
-    var(--brand-primary-soft),
-    var(--brand-secondary-soft)
-  );
+.home-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  align-items: start;
 }
-.hero-inner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  color: #fff;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-.hero-title {
-  font-size: 38px;
-  font-weight: 700;
-  margin: 0;
-}
-.hero-subtitle {
-  font-size: 16px;
-  opacity: 0.92;
-  margin: 12px 0 0;
+.home-sidebar {
+  position: sticky;
+  top: 80px;
 }
 
 .section-title {
   font-size: 22px;
   font-weight: 600;
-  margin: 24px 0 16px;
-}
-
-.recommend-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
+  margin: 0 0 16px;
 }
 
 .article-list {
@@ -134,5 +101,15 @@ const articleSkeletons = [1, 2, 3, 4, 5, 6]
   border-radius: 999px;
   padding: 2px 10px;
   font-size: 12px;
+}
+
+/* 响应式：窄屏收起左侧栏 */
+@media (max-width: 900px) {
+  .home-body {
+    grid-template-columns: 1fr;
+  }
+  .home-sidebar {
+    position: static;
+  }
 }
 </style>
