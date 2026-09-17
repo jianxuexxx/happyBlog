@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ArrowDown } from '@element-plus/icons-vue'
 import CarouselHero from '../components/home/CarouselHero.vue'
 import SidebarRecommended from '../components/home/SidebarRecommended.vue'
 import NoticeFloat from '../components/home/NoticeFloat.vue'
@@ -28,16 +29,17 @@ function toggleExpand() {
 
     <!-- 正文板块：负 margin 遮盖轮播下部 -->
     <div class="home-body" :class="{ expanded: isExpanded }" :style="{ marginTop: isExpanded ? 0 : -COVER_OFFSET + 'px' }">
-      <!-- 展开按钮：位于图片下缘（正文顶部） -->
+      <!-- 展开/收起按钮：位于图片下缘（正文顶部），下箭头图标 -->
       <div class="cover-toolbar">
         <el-button
+          circle
           :type="isExpanded ? 'default' : 'primary'"
-          round
-          size="small"
+          :icon="ArrowDown"
+          :class="{ 'is-up': isExpanded }"
+          aria-label="查看全部图片"
+          title="查看全部图片"
           @click="toggleExpand"
-        >
-          {{ isExpanded ? '收起内容' : '🖼 查看全部图片' }}
-        </el-button>
+        />
       </div>
 
       <div class="home-grid">
@@ -86,6 +88,15 @@ function toggleExpand() {
   display: flex;
   justify-content: center;
   padding: 4px 0 12px;
+}
+
+/* 展开时箭头旋转朝上（收起内容） */
+.cover-toolbar :deep(.is-up .el-icon) {
+  rotate: 180deg;
+  transition: rotate var(--duration-base) var(--spring-curve);
+}
+.cover-toolbar :deep(.el-icon) {
+  transition: rotate var(--duration-base) var(--spring-curve);
 }
 
 .home-grid {
