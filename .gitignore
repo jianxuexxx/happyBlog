@@ -1,0 +1,24 @@
+# ---- Node / Vue ----
+node_modules/
+dist/
+.npm/
+.vite/
+
+# ---- Java / Spring Boot ----
+backend/target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ---- OS / misc ----
+.DS_Store
+Thumbs.db
+*.log
+.tmp/
