@@ -1,4 +1,4 @@
-# 我的博客系统
+# HappyBlog - 我的博客系统
 
 参考 [POETIZE - 最美博客](https://poetize.cn/) 的视觉风格，搭建一套个人博客系统。
 
