@@ -1,6 +1,6 @@
 # 前端骨架 + 主题系统 实现计划
 
-> **面向 AI 代理的工作者：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 逐任务实现此计划。步骤使用复选框（`- [ ]`）语法来跟踪进度。
+> **面向 AI 代理的工作者：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 逐任务实现此计划。步骤使用复选框（`- [x]`）语法来跟踪进度。
 
 **目标：** 在 `frontend/` 下搭建可运行的 Vue 3 单应用：蓝粉淡色 + iPhone 设计准则的主题系统、前台与 `/admin` 路由骨架、基础布局（毛玻璃导航）、Axios 统一 API 层、Pinia 状态骨架，全部采用驼峰命名。
 
@@ -11,6 +11,8 @@
 **外部依赖约定：**
 - npm registry 默认可达；如网络受限在后端阶段再处理镜像
 - 所有新文件路径以 `D:\projects\myblog\frontend\` 为前缀
+
+> **执行状态：** ✅ 任务 1-9 已全部完成（2026-09-17）。实际实现与计划的差异、首页 v2 组件结构详见文末「执行记录」。
 
 ---
 
@@ -55,7 +57,7 @@
 - 创建：`frontend/package.json`, `frontend/vite.config.ts`, `frontend/tsconfig.json`, `frontend/tsconfig.node.json`, `frontend/index.html`, `frontend/src/main.ts`, `frontend/src/App.vue`
 - 修改：`frontend/public` 静态目录
 
-- [ ] **步骤 1：生成脚手架**
+- [x] **步骤 1：生成脚手架**
 
 在 `D:\projects\myblog\frontend` 下执行：
 
@@ -67,7 +69,7 @@ npm create vite@latest . -- --template vue-ts
 
 （若脚手架交互询问，选默认 vue-ts 模板。目录非空时的提示选择 overwrite —— 当前 frontend 为空，探头知会无冲突。）
 
-- [ ] **步骤 2：安装依赖**
+- [x] **步骤 2：安装依赖**
 
 ```bash
 npm install
@@ -77,7 +79,7 @@ npm install -D @types/node
 
 预期：`npm install` 成功无 EPERM 报错；`npm run dev` 可启动（Ctrl+C 停止）。
 
-- [ ] **步骤 3：锁定脚本，验证 dev 与 build**
+- [x] **步骤 3：锁定脚本，验证 dev 与 build**
 
 修改 `package.json` 的 `scripts`，确保含：
 ```json
@@ -99,7 +101,7 @@ npm run build
 
 预期：在 `frontend/node_modules/.bin` 下能解析 `vue-tsc`（无则 `npm install -D vue-tsc` 补装），构建输出 `frontend/dist/` 成功，退出码 0。
 
-- [ ] **步骤 4：快速启动冒烟**
+- [x] **步骤 4：快速启动冒烟**
 
 ```bash
 npm run dev -- --port 17532 &
@@ -108,7 +110,7 @@ sleep 8 && curl -s http://localhost:17532 | grep -o "<title>[^<]*</title>"
 
 预期：返回页面含 `<title>Vite + Vue + TS</title>` 或自定义标题。然后 `kill` 掉后台进程。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 cd D:/projects/myblog
@@ -127,7 +129,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>
 - 创建：`frontend/src/styles/global.css`
 - 修改：`frontend/src/main.ts`（引入样式）
 
-- [ ] **步骤 1：编写 tokens.css（含先失败的"暗色主体类名契约"测试）**
+- [x] **步骤 1：编写 tokens.css（含先失败的"暗色主体类名契约"测试）**
 
 创建 `frontend/src/styles/tokens.css`，**必须包含以下变量的完整定义**（蓝粉淡色系 + iPhone 准则，约束见记忆 design-constraints）：
 
@@ -208,7 +210,7 @@ describe('tokens.css 契约', () => {
 })
 ```
 
-- [ ] **步骤 2：运行测试确认失败（此时文件不存在）**
+- [x] **步骤 2：运行测试确认失败（此时文件不存在）**
 
 ```bash
 cd D:/projects/myblog/frontend && npx vitest run src/__tests__/theme-tokens.test.ts
@@ -216,7 +218,7 @@ cd D:/projects/myblog/frontend && npx vitest run src/__tests__/theme-tokens.test
 
 预期：FAIL，报错 `ENOENT ... tokens.css`。
 
-- [ ] **步骤 3：创建 tokens.css 与 global.css**
+- [x] **步骤 3：创建 tokens.css 与 global.css**
 
 tokens.css 内容如步骤 1。创建 `frontend/src/styles/global.css`：
 
@@ -240,7 +242,7 @@ body {
 }
 ```
 
-- [ ] **步骤 4：main.ts 引入样式**
+- [x] **步骤 4：main.ts 引入样式**
 
 修改 `frontend/src/main.ts`，在 `createApp(App)` 之前：
 
@@ -250,7 +252,7 @@ import './styles/tokens.css'
 import './styles/global.css'
 ```
 
-- [ ] **步骤 5：运行测试确认通过**
+- [x] **步骤 5：运行测试确认通过**
 
 ```bash
 npx vitest run src/__tests__/theme-tokens.test.ts
@@ -258,7 +260,7 @@ npx vitest run src/__tests__/theme-tokens.test.ts
 
 预期：PASS（3 个用例）。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 cd D:/projects/myblog && git add frontend/ && git commit -m "feat: 蓝粉淡色主题 token 与全局样式
@@ -275,7 +277,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - 创建：`frontend/src/store/theme.ts`
 - 创建：`frontend/src/__tests__/storage.test.ts`
 
-- [ ] **步骤 1：编写失败测试**
+- [x] **步骤 1：编写失败测试**
 
 `frontend/src/__tests__/storage.test.ts`：
 
@@ -303,12 +305,12 @@ describe('storage 安全读写', () => {
 })
 ```
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 `cd D:/projects/myblog/frontend && npx vitest run src/__tests__/storage.test.ts`
 预期：FAIL，模块不存在。
 
-- [ ] **步骤 3：实现 storage.ts**
+- [x] **步骤 3：实现 storage.ts**
 
 ```ts
 export function setStorage<T>(key: string, value: T): void {
@@ -325,11 +327,11 @@ export function removeStorage(key: string): void {
 }
 ```
 
-- [ ] **步骤 4：运行测试确认通过**
+- [x] **步骤 4：运行测试确认通过**
 
 预期：PASS（4 用例）。
 
-- [ ] **步骤 5：实现 theme store**
+- [x] **步骤 5：实现 theme store**
 
 `frontend/src/store/theme.ts`：
 
@@ -359,7 +361,7 @@ export const useThemeStore = defineStore('theme', () => {
 
 （骨架阶段 theme 测试可并入 tokens 测试，不单独开组件测试；`apply()` 的 DOM 断言放到任务 7 的表单/导航测试中。）
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 cd D:/projects/myblog && git add frontend/ && git commit -m "feat: storage 工具 + 主题 store
@@ -375,7 +377,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - 创建：`frontend/src/api/http.ts`
 - 创建：`frontend/src/__tests__/http.test.ts`
 
-- [ ] **步骤 1：编写失败测试**
+- [x] **步骤 1：编写失败测试**
 
 `frontend/src/__tests__/http.test.ts`（用 axios 的 mock adapter 思路——骨架阶段用最小依赖：直接测解包函数而非完整请求）：
 
@@ -394,11 +396,11 @@ describe('统一响应解包 http.unwrapResult', () => {
 })
 ```
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 预期：FAIL，`Cannot find module '../api/http'`。
 
-- [ ] **步骤 3：实现 http.ts**
+- [x] **步骤 3：实现 http.ts**
 
 ```ts
 import axios from 'axios'
@@ -435,11 +437,11 @@ http.interceptors.response.use(
 export default http
 ```
 
-- [ ] **步骤 4：运行测试确认通过**
+- [x] **步骤 4：运行测试确认通过**
 
 预期：PASS（2 用例）。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 cd D:/projects/myblog && git add frontend/ && git commit -m "feat: axios 统一响应解包与拦截
@@ -456,7 +458,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - 创建：`frontend/src/views/Home.vue` 等占位页（本任务先建会不会被任何路由引用的证明——页组件内容极简）
 - 修改：`frontend/src/main.ts`（注册 router）
 
-- [ ] **步骤 1：实现 router/index.ts**
+- [x] **步骤 1：实现 router/index.ts**
 
 ```ts
 import { createRouter, createWebHistory } from 'vue-router'
@@ -502,11 +504,11 @@ router.beforeEach((to) => {
 export default router
 ```
 
-- [ ] **步骤 2：暂停——路由指向的视图/布局需全量存在**
+- [x] **步骤 2：暂停——路由指向的视图/布局需全量存在**
 
 复用本任务步骤 3 全量创建占位视图（每条路由对应文件）。为保持步幅可独立测试，这里先全部创建，测试放步骤 5 的编译冒烟。
 
-- [ ] **步骤 3：创建全部占位视图 + 布局**
+- [x] **步骤 3：创建全部占位视图 + 布局**
 
 每个占位视图如 `frontend/src/views/Home.vue`：
 
@@ -522,7 +524,7 @@ export default router
 新建（内容均为此结构，标题文案对应页面名）：
 `Home.vue`、`ArticleDetail.vue`、`Category.vue`、`Tag.vue`、`Archive.vue`、`Search.vue`、`Friends.vue`、`About.vue`、`NotFound.vue`、`admin/Login.vue`、`admin/Dashboard.vue`、`layouts/AdminLayout.vue`、`layouts/AppLayout.vue`（AppLayout 本任务先建，供后续任务用）。
 
-- [ ] **步骤 4：main.ts 注册 router 与 pinia**
+- [x] **步骤 4：main.ts 注册 router 与 pinia**
 
 ```ts
 import { createPinia } from 'pinia'
@@ -534,7 +536,7 @@ app.use(router)
 app.mount('#app')
 ```
 
-- [ ] **步骤 5：编译冒烟验证（TS 检查所有懒加载路径存在）**
+- [x] **步骤 5：编译冒烟验证（TS 检查所有懒加载路径存在）**
 
 ```bash
 npm run build
@@ -542,7 +544,7 @@ npm run build
 
 预期：vue-tsc 不报 `Cannot find module 'xxx.vue'`；dist 生成成功。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 cd D:/projects/myblog && git add frontend/ && git commit -m "feat: 路由骨架与占位视图
@@ -559,7 +561,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - 创建：`frontend/src/components/layout/AppFooter.vue`
 - 创建：`frontend/src/layouts/AppLayout.vue`（上任务已建占位，此任务改为真实布局）
 
-- [ ] **步骤 1：AppNavbar.vue**
+- [x] **步骤 1：AppNavbar.vue**
 
 ```vue
 <script setup lang="ts">
@@ -621,7 +623,7 @@ const drawerOpen = ref(false)
 </style>
 ```
 
-- [ ] **步骤 2：AppFooter.vue**
+- [x] **步骤 2：AppFooter.vue**
 
 ```vue
 <template>
@@ -636,7 +638,7 @@ const drawerOpen = ref(false)
 </style>
 ```
 
-- [ ] **步骤 3：AppLayout.vue 真实化**
+- [x] **步骤 3：AppLayout.vue 真实化**
 
 ```vue
 <script setup lang="ts">
@@ -658,7 +660,7 @@ import AppFooter from '../components/layout/AppFooter.vue'
 </style>
 ```
 
-- [ ] **步骤 4：让首页/前台路由套用 AppLayout**
+- [x] **步骤 4：让首页/前台路由套用 AppLayout**
 
 改 `frontend/src/router/index.ts`：顶部:
 
@@ -668,7 +670,7 @@ import AppFooter from '../components/layout/AppFooter.vue'
 
 （将 Home/Article/Archive/... 全部移入其 children，`/admin` 保持不变。守卫逻辑不变。）
 
-- [ ] **步骤 5：构建 + 主题冒烟**
+- [x] **步骤 5：构建 + 主题冒烟**
 
 ```bash
 npm run build
@@ -678,7 +680,7 @@ sleep 8 && curl -s http://localhost:17532 | grep -c "我的博客"
 
 预期：build 成功；dev 页面包含"我的博客"文字。杀掉后台 dev 进程。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 cd D:/projects/myblog && git add frontend/ && git commit -m "feat: 毛玻璃导航 + 页脚 + 前台布局
@@ -693,11 +695,11 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 **文件：**
 - 修改：`frontend/src/views/Home.vue`
 
-- [ ] **步骤 1：创建图片占位说明文件**
+- [x] **步骤 1：创建图片占位说明文件**
 
 在 `frontend/public/images/` 下创建 `README.md`，内容即设计规格 §14 的图片清单（site-logo / site-avatar / hero-bg / favicon）并注明"用户自行提供，未提供时前端显示占位"。
 
-- [ ] **步骤 2：实现 Home.vue**（Hero + 文章骨架卡片，点明图片占位用法）
+- [x] **步骤 2：实现 Home.vue**（Hero + 文章骨架卡片，点明图片占位用法）
 
 ```vue
 <script setup lang="ts">
@@ -767,7 +769,7 @@ const articleSkeletons = [1, 2, 3, 4, 5, 6]
 
 注意：`var(--radius-card)*2` 是非法的 CSS——用 `calc(var(--radius-card) * 2)`。
 
-- [ ] **步骤 3：构建验证**
+- [x] **步骤 3：构建验证**
 
 ```bash
 npm run build
@@ -775,7 +777,7 @@ npm run build
 
 预期：编译通过（无未定义变量/语法错）。
 
-- [ ] **步骤 4：Commit**
+- [x] **步骤 4：Commit**
 
 ```bash
 cd D:/projects/myblog && git add frontend/ && git commit -m "feat: 首页 Hero 与卡片骨架（图片占位）
@@ -787,11 +789,11 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ### 任务 8：picture 占位清单输出（无代码）
 
-- [ ] **步骤 1：汇总图片素材清单并交付给用户**
+- [x] **步骤 1：汇总图片素材清单并交付给用户**
 
 在任务完成后，向用户输出以下的图片占位清单（与规格 §14 对齐），请用户按格式准备图片：`site-logo`、`site-avatar`、`hero-bg`、`favicon`、（文章封面 `cover-*`、友链 `friend-*` 在对应功能落地时再出）。格式：PNG（logo/avatar/favicon）、JPG 或 WebP（hero/封面色），尺寸按规格。
 
-- [ ] **步骤 2：更新 README 的项目图片说明**
+- [x] **步骤 2：更新 README 的项目图片说明**
 
 在 `frontend/public/images/README.md` 中已含清单，确认与规格 §14 一致后 Commit。
 
@@ -807,7 +809,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 **文件：** 无新文件
 
-- [ ] **步骤 1：全量测试 + 生产构建**
+- [x] **步骤 1：全量测试 + 生产构建**
 
 ```bash
 cd D:/projects/myblog/frontend
@@ -817,7 +819,7 @@ npm run build
 
 预期：Vitest 全部通过；vue-tsc 无错；dist 产出。
 
-- [ ] **步骤 2：Compose 外的本地联调冒烟（无后端时）**
+- [x] **步骤 2：Compose 外的本地联调冒烟（无后端时）**
 
 ```bash
 npm run dev -- --port 17532 &
@@ -826,7 +828,7 @@ curl -s http://localhost:17532 | grep -c "我的博客"
 
 预期：首页文案可见（前端骨架完成标准：**路由全部可达、主题可切、页面占位渲染**）。
 
-- [ ] **步骤 3：最终 Commit（如仍有零散改动）**
+- [x] **步骤 3：最终 Commit（如仍有零散改动）**
 
 ```bash
 cd D:/projects/myblog && git add -A && git commit -m "chore: 前端骨架收尾
@@ -852,3 +854,23 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 **3. 类型一致性：** `useThemeStore` 导出自 `store/theme.ts` 并仅被 Navbar 使用；`unwrapResult` 仅本文件定义；`src/api/*.ts` 业务 API 文件不在骨架范围内（留给页面任务）；占位视图均按本计划创建的文件名。
 
 **4. 环境边界：** 前端仅依赖 Node 22（✅ 已装）；不涉及 JDK/Docker；端口 17532 为前端开发专用（避开 18088）。
+
+---
+
+## 执行记录（2026-09-17 收尾）
+
+**完成情况：** 任务 1-9 全部完成；`npm test` 10/10 通过，`npm run build`（vue-tsc + vite）通过。首页 v2 布局在骨架基础上细化落地，设计规格 §5「首页布局 v2」已同步为最终交互。
+
+**与计划的实现差异（实际为准）：**
+- `main.ts`：Element Plus 必须 `app.use(ElementPlus)` 全量注册组件——只 import 样式会导致所有 `el-*` 组件以未解析原生标签渲染（如 `<el-button>` 直接输出、icon 属性被序列化为 `[object Object]`），图标整体消失。已修复（commit `0ec639e`）。
+- 图片占位引用：`<img src="/images/site-logo.png">` 这种静态字符串会在构建期报 `[UNRESOLVED_IMPORT]`——改用变量绑定 `:src="HERO_BG"` + `@error` 隐藏 img，或 `<span class="img-placeholder">` 占位。
+- 图标尺寸：`@element-plus/icons-vue` 图标渲染出的 `<svg>` 不带 width/height 属性；脱离 EP `.el-icon` 包装直接使用时必须显式定尺寸（`width:1em; height:1em`），否则计算尺寸 0×0、完全不可见（commit `fb2b18b`）。
+- devDependency 新增 `puppeteer-core`：驱动本机 Edge 做无头 UI 验证，读 `getComputedStyle` 才能发现「DOM 在但计算尺寸为 0 / 颜色未应用」这类 dump-dom 与 curl 都看不出的渲染缺陷。
+
+**首页 v2 最终组件结构（`frontend/src/components/home/`）：**
+- `CarouselHero.vue`：Swiper 大轮播（Autoplay + Pagination，loop），高度 `clamp(420px, 54vh, 640px)`，站点信息透明叠加，轮播 z 轴底层
+- `SidebarRecommended.vue`：左栏 sticky 推荐列表
+- `NoticeFloat.vue`：右上角毛玻璃通知浮卡（当天一次，localStorage `blog:notice-seen:{date}`）
+- `views/Home.vue`：正文顶部负 margin（-180px）遮盖轮播下部，顶部毛玻璃圆钮（下箭头，展开旋转 180°）切换 A 方案展开/收起；<900px 收起左栏
+
+**遗留（后续阶段）：** 后端骨架（Spring Boot 3 + MyBatis-Plus，端口 18088）、前台真实页面、管理端、RustFS + Docker Compose；GitHub 远端推送受网络限制未完成，本地较远端领先若干 commit。
