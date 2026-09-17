@@ -123,7 +123,13 @@ function toggleExpand() {
 .cover-toggle-icon {
   display: inline-flex;
   font-size: 18px;
+  color: var(--brand-primary); /* 箭头着色（svg 路径 fill=currentColor） */
   transition: rotate var(--duration-base) var(--spring-curve);
+}
+.cover-toggle-icon svg {
+  /* icons-vue 的图标不带 width/height 属性，裸 svg 默认 0×0 不可见，必须显式定尺寸 */
+  width: 1em;
+  height: 1em;
 }
 /* 展开时箭头旋转朝上（收起内容） */
 .cover-toggle.is-up .cover-toggle-icon {
