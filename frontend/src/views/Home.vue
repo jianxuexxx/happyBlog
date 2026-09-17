@@ -31,15 +31,17 @@ function toggleExpand() {
     <div class="home-body" :class="{ expanded: isExpanded }" :style="{ marginTop: isExpanded ? 0 : -COVER_OFFSET + 'px' }">
       <!-- 展开/收起按钮：位于图片下缘（正文顶部），下箭头图标 -->
       <div class="cover-toolbar">
-        <el-button
-          circle
-          :type="isExpanded ? 'default' : 'primary'"
-          :icon="ArrowDown"
+        <!-- 毛玻璃透明圆按钮：外框透明（毛玻璃），内部为品牌蓝下箭头 -->
+        <button
+          type="button"
+          class="cover-toggle"
           :class="{ 'is-up': isExpanded }"
           aria-label="查看全部图片"
           title="查看全部图片"
           @click="toggleExpand"
-        />
+        >
+          <span class="cover-toggle-icon"><ArrowDown /></span>
+        </button>
       </div>
 
       <div class="home-grid">
@@ -90,13 +92,42 @@ function toggleExpand() {
   padding: 4px 0 12px;
 }
 
-/* 展开时箭头旋转朝上（收起内容） */
-.cover-toolbar :deep(.is-up .el-icon) {
-  rotate: 180deg;
+/* 毛玻璃透明圆按钮：外框透明（毛玻璃磨砂），内部品牌蓝箭头 */
+.cover-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  color: var(--brand-primary); /* 箭头颜色（svg 用 currentColor） */
+  transition:
+    box-shadow var(--duration-base) var(--spring-curve),
+    transform var(--duration-base) var(--spring-curve),
+    background-color var(--duration-base) var(--spring-curve);
+}
+.cover-toggle:hover {
+  box-shadow: var(--shadow-hover);
+  transform: scale(1.06);
+}
+.cover-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary-soft);
+  outline-offset: 2px;
+}
+.cover-toggle-icon {
+  display: inline-flex;
+  font-size: 18px;
   transition: rotate var(--duration-base) var(--spring-curve);
 }
-.cover-toolbar :deep(.el-icon) {
-  transition: rotate var(--duration-base) var(--spring-curve);
+/* 展开时箭头旋转朝上（收起内容） */
+.cover-toggle.is-up .cover-toggle-icon {
+  rotate: 180deg;
 }
 
 .home-grid {
