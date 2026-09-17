@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useThemeStore } from '../../store/theme'
+import { Moon, Sunny } from '@element-plus/icons-vue'
 
 const theme = useThemeStore()
 
@@ -34,7 +35,7 @@ const menus = [
     <div class="navbar-actions">
       <el-button
         circle
-        :icon="theme.isDark ? 'Sunny' : 'Moon'"
+        :icon="theme.isDark ? Sunny : Moon"
         :title="theme.isDark ? '切换到亮色' : '切换到暗色'"
         @click="theme.toggle()"
       />
