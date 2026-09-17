@@ -1,0 +1,70 @@
+/* ============================================================
+   HappyBlog 主题 token —— 蓝粉淡色系 + iPhone 设计准则
+   约束来源：设计规格 §6 / 记忆 design-constraints
+   ============================================================ */
+
+:root {
+  /* ---- 品牌色：蓝 × 粉 主基调 ---- */
+  --brand-primary: #5b9cf5;
+  --brand-primary-soft: #8bb8f8;
+  --brand-secondary: #f48fb1;
+  --brand-secondary-soft: #ffd6e8;
+  --brand-accent: #b2d8f0;
+  --brand-accent-soft: #fef2f7;
+
+  /* ---- 背景：淡色渐变（雾蓝 → 白 → 淡粉） ---- */
+  --bg-gradient: linear-gradient(180deg, #f4f6ff, #ffffff 50%, #fef2f7);
+  --bg-color: #f4f6ff;
+
+  /* ---- 文字 ---- */
+  --text-primary: #1f2a3a;
+  --text-secondary: #616161;
+  --text-muted: #9aa5b1;
+
+  /* ---- iPhone 设计准则 ---- */
+  /* 连续曲率圆角 */
+  --radius-card: 18px;      /* 卡片：16–20px */
+  --radius-btn: 12px;       /* 按钮/输入框：10–14px */
+  --radius-dialog: 24px;    /* 弹窗：24px+ */
+
+  /* 8pt 间距栅格 */
+  --space-unit: 8px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+
+  /* 柔和低饱和阴影 */
+  --shadow-soft: 0 2px 12px rgba(31, 42, 58, 0.08);
+  --shadow-hover: 0 8px 24px rgba(31, 42, 58, 0.12);
+
+  /* spring 弹簧曲线动效 */
+  --spring-curve: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-base: 250ms;
+
+  /* ---- 字体 ---- */
+  --font-sans: 'PingFang SC', 'SF Pro Display', -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --font-num: 'SF Pro Text', 'SF Mono', 'DIN Alternate', 'Segoe UI', sans-serif;
+
+  /* ---- 毛玻璃 ---- */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-blur: saturate(180%) blur(16px);
+  --glass-border: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- 暗色模式 ---- */
+:root.dark {
+  --bg-gradient: linear-gradient(180deg, #221831, #1b1b2e 50%, #15151c);
+  --bg-color: #1b1b2e;
+
+  --text-primary: #e4e4e4;
+  --text-secondary: #d4d4d4;
+  --text-muted: #9aa5b1;
+
+  --glass-bg: rgba(27, 27, 46, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.12);
+
+  --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5);
+}

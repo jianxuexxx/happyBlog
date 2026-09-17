@@ -1,0 +1,75 @@
+/* ============================================================
+   HappyBlog 全局基础样式
+   依赖 tokens.css 中定义的 CSS 变量
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  transition:
+    background var(--duration-base) var(--spring-curve),
+    color var(--duration-base) var(--spring-curve);
+}
+
+/* ---- 图片占位（设计规格 §14：用户提供真实图片前显示占位样式） ---- */
+.img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    var(--brand-accent-soft),
+    var(--brand-secondary-soft)
+  );
+  color: var(--text-muted);
+  font-size: 14px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* ---- 通用卡片 ---- */
+.card {
+  background: var(--glass-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  transition:
+    transform var(--duration-base) var(--spring-curve),
+    box-shadow var(--duration-base) var(--spring-curve);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ---- 数字字体（浏览量/日期） ---- */
+.num {
+  font-family: var(--font-num);
+}
+
+/* ---- 细滚动条（iOS 风格） ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--brand-accent);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
