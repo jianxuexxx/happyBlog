@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { getStorage, setStorage } from '../../utils/storage'
 
 /**
- * 右侧悬浮通知（v2 需求）
+ * 右上角悬浮通知（v2 需求）
  * 当天有新通知（notice 表）时弹悬浮框；当天只弹一次（localStorage 记录日期）。
  */
 
@@ -62,7 +62,7 @@ function close() {
 .notice-float {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  top: 84px; /* 导航栏(64px)下方 */
   z-index: 200;
   width: 300px;
   max-width: calc(100vw - 48px);
@@ -70,6 +70,7 @@ function close() {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--radius-card);
 }
 .notice-header {
   display: flex;
@@ -120,6 +121,6 @@ function close() {
 .notice-fade-enter-from,
 .notice-fade-leave-to {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateX(24px);
 }
 </style>
