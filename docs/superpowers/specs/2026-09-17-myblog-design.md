@@ -106,13 +106,15 @@ MyBatis-Plus 配置：`@TableField(fill=INSERT/INSERT_UPDATE)` 自动填充时�
 **articleTag 关联表**：`id`, `articleId`, `tagId`, 公共字段（多对多，逻辑删除）
 **friendLink 友链表**：`friendLinkId`, `name`, `url`, `avatar`, `description`, `sortOrder`, 公共字段
 **siteConfig 站点配置表**：`configKey`(PK), `configValue`, 公共字段
+**notice 通知表**（v2 新增）：`noticeId`, `title`, `content`, `startsAt`（生效时间起）, `endsAt`（生效时间止，可空）, 公共字段
 
 关系：文章-分类 多对一；文章-标签 多对多；删除文章/标签时对应 `articleTag` 逻辑删；删除分类时文章 `categoryId` 置空。
 
 ## 5. 前端页面与路由
 
 ```
-/                      首页：导航 + Hero 诗意区 + 推荐 Swiper + 文章瀑布流卡片
+/                      首页：导航 + 顶部大轮播图（拖动展开）+ 左侧推荐文章展位
+                       + 主区文章瀑布流 + 右侧悬浮通知
 /article/:articleId    文章详情：元信息 + Markdown 渲染 + 标签 + 上一篇/下一篇
 /category/:id          分类文章列表
 /tag/:id               标签文章列表
@@ -126,10 +128,22 @@ MyBatis-Plus 配置：`@TableField(fill=INSERT/INSERT_UPDATE)` 自动填充时�
 /admin/categories      分类管理
 /admin/tags            标签管理
 /admin/friends         友链管理
+/admin/notices         通知管理（v2 新增）
 /admin/settings        站点配置
 ```
 
 > 管理端为同一 Vue 应用内 `/admin` 路由懒加载。
+
+**首页布局 v2（2026-09-17 用户细化）：**
+- **顶部大轮播图**（Swiper 轮播），交互为**拖动展开**：默认露出顶部一部分高度，向下拖动展开至全高，向上滑收起为部分显示
+- **左侧栏展位**：预留模块位，当前先展示**推荐文章**（封面缩略 + 标题）
+- **右侧悬浮通知**：当天有新通知（notice 表）时弹出悬浮卡片（右下角毛玻璃），当天只弹一次（前端本地记 `blog:notice-seen:{date}`），可手动关闭
+- 主区为文章瀑布流列表
+
+**通知模块（v2 新增）：**
+- 数据：`notice` 表（见 §4），后台 `/admin/notices` 管理，逻辑删除
+- 前台：`GET /api/notice/today` 返回当天最新通知；当天有则弹出悬浮框
+- 缓存：当天通知短缓存，发布即失效
 
 ## 6. 视觉规范（强制约束）
 
@@ -178,6 +192,7 @@ GET  /api/category/list              分类（含文章数）
 GET  /api/tag/list                   标签（含文章数）
 GET  /api/tag/cloud                  标签云
 GET  /api/friend/list                友链
+GET  /api/notice/today               当天通知（v2）
 ```
 
 **管理端（`/api/admin/**`）：**
@@ -194,6 +209,8 @@ POST /api/admin/category             新增     PUT /api/admin/category 更新
 DELETE /api/admin/category/{id}      逻辑删除
 POST /api/admin/tag                  新增     DELETE /api/admin/tag/{id}
 POST /api/admin/friend               新增     PUT /api/admin/friend 更新   DELETE /api/admin/friend/{id}
+POST /api/admin/notice               新增通知  PUT /api/admin/notice 更新  DELETE /api/admin/notice/{id}
+GET  /api/admin/notice/list          通知列表（v2）
 GET  /api/admin/upload/presign       RustFS presigned URL 签发
 GET  /api/admin/images               图库列表     DELETE /api/admin/images 删除
 PUT  /api/admin/site/config          保存站点配置
