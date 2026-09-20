@@ -32,7 +32,14 @@ spring:
 
 mybatis-plus:
   configuration:
-    map-underscore-to-camel-case: true
+    # 必须为 false：本项目 DDL 与实体字段统一用驼峰列名（`coverImage`、`categoryName`、`createdAt` …）。
+    # 该开关为 true 时，没有显式 @TableField(value=...) 的字段名会被 camelToUnderline 转成下划线
+    # 再去找列（cover_image），与 DDL 对不上，BaseMapper 生成的 insert / selectById / updateById /
+    # 逻辑删除会全部抛 1054 Unknown column。这是「看着没问题、单测全绿、连真库才炸」的静默陷阱：
+    # 它是列名的唯一控制点（TableInfo 构造时读 Configuration.isMapUnderscoreToCamelCase() 存入
+    # underCamel），主键与表名因 @TableId(value=...) / @TableName(...) 显式给值而幸免。
+    # 回归护栏见 ColumnNamingConventionTest。
+    map-underscore-to-camel-case: false
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     banner: false
