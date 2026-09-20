@@ -47,6 +47,14 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
+        <!-- MyBatis-Plus 3.5.9 起，依赖 JSqlParser 的插件（分页、防全表更新、非法 SQL）被拆到独立 artifact，
+             PaginationInnerInterceptor 已不在 mybatis-plus-extension 中，必须显式引入，否则分页配置无法编译 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
