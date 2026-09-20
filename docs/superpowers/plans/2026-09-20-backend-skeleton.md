@@ -43,13 +43,13 @@ JAVA_HOME=/e/works/jdk21 PATH=/e/works/jdk21/bin:$PATH /e/works/apache-maven-3.8
 | 文件 | 职责 |
 |------|------|
 | `pom.xml` | 依赖与构建配置 |
-| `src/main/java/com/blog/MyBlogApplication.java` | 启动类 + `@MapperScan` |
+| `src/main/java/com/blog/MyBlogApplication.java` | 启动类（只含 `@SpringBootApplication`，**不含** `@MapperScan`） |
 | `src/main/java/com/blog/common/Result.java` | 统一返回体 `{code, message, data}` |
 | `src/main/java/com/blog/common/ResultCode.java` | 错误码枚举（唯一真相源） |
 | `src/main/java/com/blog/common/PageResult.java` | 分页返回体（本切片不用，供后续 article 列表） |
 | `src/main/java/com/blog/common/BizException.java` | 携带错误码的业务异常 |
 | `src/main/java/com/blog/common/GlobalExceptionHandler.java` | 全局异常 → 错误码转译 |
-| `src/main/java/com/blog/config/MybatisPlusConfig.java` | 分页拦截器 |
+| `src/main/java/com/blog/config/MybatisPlusConfig.java` | 分页拦截器 + `@MapperScan("com.blog.mapper")` |
 | `src/main/java/com/blog/config/AuditMetaObjectHandler.java` | 公共字段自动填充 |
 | `src/main/java/com/blog/config/RedisConfig.java` | `RedisTemplate<String,Object>` + JSON 序列化 |
 | `src/main/java/com/blog/config/WebMvcConfig.java` | 注册 JWT 拦截器 |
@@ -347,12 +347,10 @@ public class BizException extends RuntimeException {
 ```java
 package com.blog;
 
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@MapperScan("com.blog.mapper")
 public class MyBlogApplication {
 
     public static void main(String[] args) {
@@ -360,6 +358,16 @@ public class MyBlogApplication {
     }
 }
 ```
+
+> **启动类只留 `@SpringBootApplication`，`@MapperScan` 不标在这里。**
+> `@MapperScan` 由 `MapperScannerRegistrar` 实现，它是一个 `ImportBeanDefinitionRegistrar`，而 `@WebMvcTest`
+> 切片是以启动类为配置类的 —— 注册器随启动类一起进切片，不受切片的类型过滤（`TypeExcludeFilter`）约束。
+> 切片里没有 `MybatisPlusAutoConfiguration`，也就没有 `SqlSessionFactory`，于是每个 `MapperFactoryBean`
+> 都在 `afterPropertiesSet` 抛 `IllegalArgumentException: Property 'sqlSessionFactory' or 'sqlSessionTemplate' are required`，
+> 整个切片上下文加载失败 —— Web 层测试全红，却与 Web 层代码毫无关系。
+> 因此 `@MapperScan("com.blog.mapper")` 标在普通 `@Configuration` 的 `MybatisPlusConfig` 上（任务 3 步骤 7）：
+> 该类的类型不在 `@WebMvcTest` 的纳入范围（只纳入 `@Controller` / `@ControllerAdvice` / `Filter` /
+> `WebMvcConfigurer` / `HandlerInterceptor` 等），切片不会扫它；运行时组件扫描 `com.blog.**` 仍会扫到该类，行为不变。
 
 - [ ] **步骤 7：创建 `application.yml`**
 
@@ -378,7 +386,7 @@ spring:
   config:
     import: optional:file:./config/application-local.yml
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/myblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/happyblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -397,8 +405,16 @@ spring:
 
 mybatis-plus:
   configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 必须为 false：本项目 DDL 与实体字段统一用驼峰列名（`coverImage`、`categoryName`、`createdAt` …）。
+    # 该开关为 true 时，没有显式 @TableField(value=...) 的字段名会被 camelToUnderline 转成下划线
+    # 再去找列（cover_image），与 DDL 对不上，BaseMapper 生成的 insert / selectById / updateById /
+    # 逻辑删除会全部抛 1054 Unknown column。这是「看着没问题、单测全绿、连真库才炸」的静默陷阱。
+    # 回归护栏见 ColumnNamingConventionTest。
+    map-underscore-to-camel-case: false
+    # log-impl 刻意不在此设置：StdOutImpl 会把每条 SQL 连参数打到标准输出，而本文件随生产包一起上线，
+    # 等于让生产环境持续刷日志。本地要看 SQL，在 config/application-local.yml 里自行加
+    # （该文件不被 git 跟踪，不会带到生产）：
+    #   mybatis-plus.configuration.log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     banner: false
     db-config:
@@ -1296,6 +1312,7 @@ package com.blog.config;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -1303,8 +1320,13 @@ import org.springframework.context.annotation.Configuration;
  * MyBatis-Plus 插件配置。
  * 本切片的 category/list 不分页（分类量级小），分页插件在此就位供后续 article 列表直接使用。
  * MetaObjectHandler 由容器自动侦测，不在此注册。
+ *
+ * 【@MapperScan 为何在本类而不是 MyBlogApplication —— 勿挪回去】
+ * 原因见任务 1 步骤 6 的说明：标在 @SpringBootApplication 类上会被每个 @WebMvcTest 切片
+ * 连同该类一起加载，而切片里没有 SqlSessionFactory，Mapper 注册即失败，Web 层测试全红。
  */
 @Configuration
+@MapperScan("com.blog.mapper")
 public class MybatisPlusConfig {
 
     @Bean
@@ -2630,8 +2652,10 @@ public final class ValidateGroups {
 
     /**
      * 分类名是否已被占用。
-     * excludeId 用于更新场景排除自身。已逻辑删除的记录不参与判重，
-     * 因此删掉分类后可以同名重建（设计规格 §4 唯一键与 deleted 组合的意图）。
+     * excludeId 用于更新场景排除自身。
+     * 唯一性只由本方法保证：category 表刻意不建唯一索引（「列 + deleted」的组合唯一键只能
+     * 容纳一行 deleted=1，撑不起删除历史，同名记录的第二次逻辑删除会抛 MySQL 1062）。
+     * 已逻辑删除的记录不参与判重，因此删掉分类后可以同名重建（设计规格 §4）。
      */
     private boolean existsByName(String categoryName, Long excludeId) {
         LambdaQueryWrapper<Category> wrapper = Wrappers.<Category>lambdaQuery()
@@ -3427,16 +3451,19 @@ EOF
 --
 -- 约定：
 --   1. 列名使用驼峰（与 Java 实体字段同名，免去映射配置）
---   2. 所有删除一律逻辑删除（deleted 0/1），唯一键与 deleted 组合以支持删后同名重建
+--   2. 所有删除一律逻辑删除（deleted 0/1）；不建唯一索引——deleted 只有 0/1，
+--      「列 + deleted」的组合唯一键只能容纳一行 deleted=1，撑不起删除历史。
+--      唯一性由应用层查询保证（WHERE name = ? AND deleted = 0）；
+--      下方保留同列的非唯一索引，仅供查询加速。删后同名可重建。
 --   3. 不建物理外键：关系完整性由 Service 层保证，物理外键会阻碍同名重建
 --   4. createdAt/updatedAt 的 DEFAULT / ON UPDATE 是兜底（手工 SQL 插入场景），
 --      应用层由 MyBatis-Plus 的 MetaObjectHandler 填充
 
-CREATE DATABASE IF NOT EXISTS `myblog`
+CREATE DATABASE IF NOT EXISTS `happyblog`
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_0900_ai_ci;
 
-USE `myblog`;
+USE `happyblog`;
 
 -- ---------------------------------------------------------------
 -- article 文章表
@@ -3471,7 +3498,7 @@ CREATE TABLE IF NOT EXISTS `category` (
     `updatedAt`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`      TINYINT     NOT NULL DEFAULT 0      COMMENT '逻辑删除：0未删/1已删',
     PRIMARY KEY (`categoryId`),
-    UNIQUE KEY `uk_category_categoryName` (`categoryName`, `deleted`)
+    KEY `idx_category_categoryName` (`categoryName`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='分类表';
 
 -- ---------------------------------------------------------------
@@ -3484,7 +3511,7 @@ CREATE TABLE IF NOT EXISTS `tag` (
     `updatedAt` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`   TINYINT     NOT NULL DEFAULT 0      COMMENT '逻辑删除：0未删/1已删',
     PRIMARY KEY (`tagId`),
-    UNIQUE KEY `uk_tag_tagName` (`tagName`, `deleted`)
+    KEY `idx_tag_tagName` (`tagName`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='标签表';
 
 -- ---------------------------------------------------------------
@@ -3498,8 +3525,7 @@ CREATE TABLE IF NOT EXISTS `articleTag` (
     `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`   TINYINT  NOT NULL DEFAULT 0      COMMENT '逻辑删除：0未删/1已删',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_articleTag` (`articleId`, `tagId`, `deleted`),
-    KEY `idx_articleTag_articleId` (`articleId`),
+    KEY `idx_articleTag_articleId_tagId` (`articleId`, `tagId`, `deleted`),
     KEY `idx_articleTag_tagId` (`tagId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文章标签关联表';
 
@@ -3566,7 +3592,7 @@ CREATE TABLE IF NOT EXISTS `notice` (
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/myblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    url: jdbc:mysql://localhost:3306/happyblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: 请填写你的 MySQL 用户名
     password: 请填写你的 MySQL 密码
   data:
@@ -3600,8 +3626,8 @@ cd D:/projects/myblog && git check-ignore -v backend/config/application-local.ym
 cd D:/projects/myblog && git add backend/src/main/resources/db backend/config && git commit -m "$(cat <<'EOF'
 feat: 建库建表 SQL 与本地配置模板
 
-7 张表全部落地，列名用驼峰以对齐 Java 实体；唯一键与 deleted 组合
-支持删后同名重建；不建物理外键。application-local.yml 为模板，
+7 张表全部落地，列名用驼峰以对齐 Java 实体；不建唯一索引（唯一性由应用层
+查询保证），删后同名可重建；不建物理外键。application-local.yml 为模板，
 已被 gitignore 排除，由你填入真实连接串。
 
 Co-Authored-By: Claude Code <noreply@anthropic.com>
@@ -3920,7 +3946,7 @@ cd D:/projects/myblog && git ls-files backend/config/ && echo "--- 以上应为�
 在 `docs/superpowers/specs/2026-09-17-myblog-design.md` 的 §15 列表中，把第 2 步与第 3 步标注进度：
 
 ```markdown
-2. 后端骨架（Spring Boot + MyBatis-Plus + 公共字段/逻辑删除/统一返回/全局异常）✅（2026-09-20 完成，含极简 JWT 鉴权与 OpenAPI 导出）
+2. 后端骨架（Spring Boot + MyBatis-Plus + 公共字段/逻辑删除/统一返回/全局异常）✅（2026-09-20 完成，含极简 JWT 鉴权与 OpenAPI 配置就绪；导出需运行应用）
 3. 数据模型与基础 CRUD（分类/标签/文章）—— 全部 7 张表的 DDL/实体/Mapper 已就位；`category` 一条 CRUD 端到端已完成并测试覆盖，其余表待实现
 ```
 

@@ -82,7 +82,7 @@ myblog/
 
 MyBatis-Plus 配置：`@TableField(fill=INSERT/INSERT_UPDATE)` 自动填充时间；`@TableLogic` + 全局 `logic-delete-value: 1 / logic-not-delete-value: 0`。
 
-**删除策略（全局约束）**：所有删除一律**逻辑删除**，包括 `articleTag` 关联表；绝不物理删除。被删后可同名重建（唯一键 + `deleted` 组合）。
+**删除策略（全局约束）**：所有删除一律**逻辑删除**，包括 `articleTag` 关联表；绝不物理删除。被删后可同名重建（`category` / `tag` / `articleTag` 零唯一索引，唯一性由应用层查询保证 —— `deleted` 只有 0/1，「列 + deleted」的组合唯一键只能容纳一行 `deleted=1`，撑不起删除历史，同名记录的第二次逻辑删除会抛 MySQL 1062）。
 
 ### 表结构
 
@@ -102,7 +102,7 @@ MyBatis-Plus 配置：`@TableField(fill=INSERT/INSERT_UPDATE)` 自动填充时�
 | 公共字段 | | createdAt / updatedAt / deleted |
 
 **category 分类表**：`categoryId`, `categoryName`, `sortOrder`, 公共字段
-**tag 标签表**：`tagId`, `tagName`, 公共字段（`tagName` 唯一键与 deleted 组合）
+**tag 标签表**：`tagId`, `tagName`, 公共字段（`tagName` 不建唯一键，唯一性由应用层查询保证，删后同名可重建）
 **articleTag 关联表**：`id`, `articleId`, `tagId`, 公共字段（多对多，逻辑删除）
 **friendLink 友链表**：`friendLinkId`, `name`, `url`, `avatar`, `description`, `sortOrder`, 公共字段
 **siteConfig 站点配置表**：`configKey`(PK), `configValue`, 公共字段

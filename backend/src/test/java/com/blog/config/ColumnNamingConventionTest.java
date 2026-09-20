@@ -219,7 +219,7 @@ class ColumnNamingConventionTest {
      *   <li>按行处理；整行 {@code --} 注释与空行直接跳过（本文件没有行尾注释）</li>
      *   <li>行首为 {@code CREATE TABLE [IF NOT EXISTS] `x` (} 的行开启一张表</li>
      *   <li>行首为 {@code )} 的行（{@code ) ENGINE=InnoDB ... ;}）结束当前表，
-     *       其后的内容（如 {@code USE `myblog`;}）不属于任何表，一律忽略</li>
+     *       其后的内容（如 {@code USE `happyblog`;}）不属于任何表，一律忽略</li>
      *   <li>表内只有「行首就是反引号」的行才算列定义。这条规则把两类行自然排除掉：
      *       {@code PRIMARY KEY (`articleId`),} 行首是 PRIMARY；
      *       {@code KEY `idx_category_categoryName` (`categoryName`, `deleted`),} 行首是 KEY。

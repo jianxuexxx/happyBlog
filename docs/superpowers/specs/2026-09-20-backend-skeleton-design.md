@@ -214,12 +214,12 @@ Authorization: Bearer <token>
 
 ### 表清单与要点
 
-| 表 | 主键 | 关键字段 | 索引 / 唯一键 |
+| 表 | 主键 | 关键字段 | 索引（全部非唯一） |
 |----|------|---------|--------------|
 | `article` | `articleId` BIGINT AUTO_INCREMENT | `title` VARCHAR(120)、`summary` VARCHAR(300)、`content` LONGTEXT、`coverImage` VARCHAR(255)、`categoryId` BIGINT NULL、`status` TINYINT、`isTop` TINYINT、`isRecommended` TINYINT、`viewCount` INT DEFAULT 0 | `idx_article_status(status, isTop, createdAt)`、`idx_article_categoryId(categoryId)` |
-| `category` | `categoryId` BIGINT AUTO_INCREMENT | `categoryName` VARCHAR(50)、`sortOrder` INT DEFAULT 0 | `uk_category_categoryName(categoryName, deleted)` |
-| `tag` | `tagId` BIGINT AUTO_INCREMENT | `tagName` VARCHAR(50) | `uk_tag_tagName(tagName, deleted)` |
-| `articleTag` | `id` BIGINT AUTO_INCREMENT | `articleId`、`tagId` | `idx_articleTag_articleId`、`idx_articleTag_tagId`、`uk_articleTag(articleId, tagId, deleted)` |
+| `category` | `categoryId` BIGINT AUTO_INCREMENT | `categoryName` VARCHAR(50)、`sortOrder` INT DEFAULT 0 | `idx_category_categoryName(categoryName, deleted)` |
+| `tag` | `tagId` BIGINT AUTO_INCREMENT | `tagName` VARCHAR(50) | `idx_tag_tagName(tagName, deleted)` |
+| `articleTag` | `id` BIGINT AUTO_INCREMENT | `articleId`、`tagId` | `idx_articleTag_articleId_tagId(articleId, tagId, deleted)`、`idx_articleTag_tagId(tagId)` |
 | `friendLink` | `friendLinkId` BIGINT AUTO_INCREMENT | `name` VARCHAR(50)、`url` VARCHAR(255)、`avatar` VARCHAR(255)、`description` VARCHAR(200)、`sortOrder` INT | — |
 | `siteConfig` | `configKey` VARCHAR(64) PK（非自增） | `configValue` TEXT | — |
 | `notice` | `noticeId` BIGINT AUTO_INCREMENT | `title` VARCHAR(120)、`content` TEXT、`startsAt` DATETIME、`endsAt` DATETIME NULL | `idx_notice_startsAt_endsAt(startsAt, endsAt)` |
@@ -227,7 +227,7 @@ Authorization: Bearer <token>
 ### 约束决策
 
 - **不建外键约束**：主规格 §4 定义的是逻辑删除语义下的关系（删分类置空文章 `categoryId`、删标签逻辑删 `articleTag`），引用的完整性由 Service 层保证。物理外键在逻辑删除模型下会阻碍「同名重建」并增加维护负担
-- **唯一键与 `deleted` 组合**：满足主规格 §4「被删后可同名重建」
+- **不建唯一索引**：`category` / `tag` / `articleTag` 三张表**零唯一索引**，唯一性由应用层代码保证（判重查询带 `deleted = 0`）。`deleted` 只有 0/1，「列 + deleted」的组合唯一键只能容纳一行 `deleted=1`，撑不起删除历史 —— 同名记录的**第二次**逻辑删除会直接抛 MySQL 1062。表上保留的是同列的**非唯一**索引，仅供查询加速。主规格 §4「被删后可同名重建」的语义由此成立
 - `siteConfig` 主键为业务键 `configKey`，无自增列
 
 ## 8. 公共基建行为
@@ -393,7 +393,7 @@ ORDER BY c.sortOrder ASC, c.categoryId ASC
 
 ### 12.1 建库建表
 
-交付 `backend/src/main/resources/db/schema.sql`（含 `CREATE DATABASE IF NOT EXISTS myblog` 与全部 7 张表），用户手动执行。
+交付 `backend/src/main/resources/db/schema.sql`（含 `CREATE DATABASE IF NOT EXISTS happyblog` 与全部 7 张表），用户手动执行。
 
 ### 12.2 本地连接串
 
