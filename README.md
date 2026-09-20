@@ -28,4 +28,5 @@ myblog/
 └── .tmp/             # 参考素材（poetize.cn 还原用，不入库）
 ```
 
-> 状态：需求讨论中，尚未编写业务代码。
+> 状态：前端骨架（主题/路由/布局/首页 v2）与后端骨架（Spring Boot 3 + 公共基建 + JWT 鉴权 + category 竖切链路）已完成（编译与单测已验证；端到端链路待按 backend/smoke/category-smoke.sh 手工验证）。
+> 下一步：其余业务表的 CRUD、前台接口与缓存策略、管理端页面、RustFS 上传、Docker Compose 编排。
