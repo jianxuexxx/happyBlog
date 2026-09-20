@@ -1,13 +1,18 @@
 package com.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.blog.common.BizException;
+import com.blog.dto.CategorySaveDTO;
 import com.blog.dto.CategoryVO;
+import com.blog.entity.Category;
 import com.blog.mapper.ArticleMapper;
 import com.blog.mapper.CategoryMapper;
 import com.blog.util.CacheUtil;
@@ -84,5 +89,112 @@ class CategoryServiceImplTest {
 
         assertThat(result).isEmpty();
         verify(cacheUtil).set("blog:category:list", empty, Duration.ofMinutes(5));
+    }
+
+    // ---------- 写链路 ----------
+
+    private CategorySaveDTO saveDto(Long id, String name, Integer sortOrder) {
+        CategorySaveDTO dto = new CategorySaveDTO();
+        dto.setCategoryId(id);
+        dto.setCategoryName(name);
+        dto.setSortOrder(sortOrder);
+        return dto;
+    }
+
+    @Test
+    @DisplayName("新增：名称已存在抛 40002")
+    void createRejectsDuplicateName() {
+        given(categoryMapper.selectCount(any())).willReturn(1L);
+
+        assertThatThrownBy(() -> service.create(saveDto(null, "技术", 0)))
+                .isInstanceOf(BizException.class)
+                .satisfies(e -> assertThat(((BizException) e).getCode()).isEqualTo(40002));
+    }
+
+    @Test
+    @DisplayName("新增：成功时返回自增主键并清除列表缓存")
+    void createReturnsIdAndEvictsCache() {
+        given(categoryMapper.selectCount(any())).willReturn(0L);
+        doAnswer(invocation -> {
+            ((Category) invocation.getArgument(0)).setCategoryId(9L);
+            return 1;
+        }).when(categoryMapper).insert(any(Category.class));
+
+        Long id = service.create(saveDto(null, "技术", 5));
+
+        assertThat(id).isEqualTo(9L);
+        verify(cacheUtil).delete("blog:category:list");
+    }
+
+    @Test
+    @DisplayName("新增：sortOrder 为空时落库为 0")
+    void createDefaultsSortOrderToZero() {
+        given(categoryMapper.selectCount(any())).willReturn(0L);
+
+        service.create(saveDto(null, "技术", null));
+
+        verify(categoryMapper).insert(org.mockito.ArgumentMatchers.argThat(
+                (Category c) -> c.getSortOrder() == 0));
+    }
+
+    @Test
+    @DisplayName("更新：分类不存在抛 40400")
+    void updateRejectsMissingCategory() {
+        given(categoryMapper.selectById(9L)).willReturn(null);
+
+        assertThatThrownBy(() -> service.update(saveDto(9L, "技术", 0)))
+                .isInstanceOf(BizException.class)
+                .satisfies(e -> assertThat(((BizException) e).getCode()).isEqualTo(40400));
+    }
+
+    @Test
+    @DisplayName("更新：与另一个分类重名抛 40002")
+    void updateRejectsNameTakenByAnotherCategory() {
+        Category existing = new Category();
+        existing.setCategoryId(9L);
+        given(categoryMapper.selectById(9L)).willReturn(existing);
+        given(categoryMapper.selectCount(any())).willReturn(1L);
+
+        assertThatThrownBy(() -> service.update(saveDto(9L, "生活", 0)))
+                .isInstanceOf(BizException.class)
+                .satisfies(e -> assertThat(((BizException) e).getCode()).isEqualTo(40002));
+    }
+
+    @Test
+    @DisplayName("更新：成功时清除列表缓存")
+    void updateEvictsCache() {
+        Category existing = new Category();
+        existing.setCategoryId(9L);
+        given(categoryMapper.selectById(9L)).willReturn(existing);
+        given(categoryMapper.selectCount(any())).willReturn(0L);
+
+        service.update(saveDto(9L, "技术", 3));
+
+        verify(categoryMapper).updateById(any(Category.class));
+        verify(cacheUtil).delete("blog:category:list");
+    }
+
+    @Test
+    @DisplayName("删除：分类不存在抛 40400")
+    void deleteRejectsMissingCategory() {
+        given(categoryMapper.selectById(9L)).willReturn(null);
+
+        assertThatThrownBy(() -> service.delete(9L))
+                .isInstanceOf(BizException.class)
+                .satisfies(e -> assertThat(((BizException) e).getCode()).isEqualTo(40400));
+    }
+
+    @Test
+    @DisplayName("删除：逻辑删除分类、把该分类下文章的 categoryId 置空、并清除列表缓存")
+    void deleteClearsArticleReferencesAndEvictsCache() {
+        Category existing = new Category();
+        existing.setCategoryId(9L);
+        given(categoryMapper.selectById(9L)).willReturn(existing);
+
+        service.delete(9L);
+
+        verify(categoryMapper).deleteById(9L);
+        verify(articleMapper).clearCategoryId(9L);
+        verify(cacheUtil).delete("blog:category:list");
     }
 }
