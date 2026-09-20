@@ -2,6 +2,25 @@
 
 > **面向 AI 代理的工作者：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 逐任务实现此计划。步骤使用复选框（`- [ ]`）语法来跟踪进度。
 
+> ## ⚠️ 本计划已于 2026-09-20 执行完毕（13/13 任务，审查全部干净）
+>
+> **下面的 `- [ ]` 全部是初始状态，不是进度记录** —— 执行时进度记在账本里，这些框从未勾选维护。
+> 别据此判断任务没做。真实的过程记录（每个任务的提交区间、每轮修复、延后的 Minor、三条人类裁定）在
+> `.superpowers/sdd/2026-09-20-backend-skeleton/progress.md`（已 gitignore，只在本地）。
+>
+> **更要紧的是：本计划是执行前的冻结稿，部分代码块已被执行期的人类裁定推翻，
+> 与仓库里的实际代码不一致。** 已知还剩一处：
+>
+> | 位置 | 计划里写的 | 实际落地的 |
+> |---|---|---|
+> | 任务 8 步骤 4（`:2614`）`ValidateGroups.Create/Update` | `public interface Create {` | `public interface Create extends Default {` —— 裁定 C，不继承 `Default` 会让无分组的 `@NotBlank`/`@Size` **静默失效** |
+>
+> （裁定 A 的 `map-underscore-to-camel-case: false` 与裁定 B 的零唯一索引已回写进本计划，
+> 现与代码一致。）三条裁定原文见上面点名的那份账本。
+>
+> **以仓库里的代码为准，不要照本计划的代码块「修正」生产代码。** 需要改代码时，
+> 先读 `backend/src/main/java/...` 的实际内容。
+
 **目标：** 在 `backend/` 下搭建可运行的 Spring Boot 3 后端，竖切一条完整链路（HTTP → Controller → Service → MyBatis-Plus → MySQL → Redis），以 `category` 一个模块端到端跑通并被测试覆盖；其余 6 张表建好 DDL / 实体 / Mapper 但暂不写业务。
 
 **架构：** 单一 Spring Boot 应用（端口 18088），包根 `com.blog`，分层 Controller / Service / Mapper / Entity / DTO。采用「显式优先」风格：统一返回用显式 `Result<T>` 类型，缓存键名手写并逐字对齐设计规格，异常显式抛 `BizException`。JWT（HS256）保护 `/api/admin/**`，登录态另存 Redis `blog:admin:token` 以实现真实登出。**所有响应 HTTP 状态码一律 200**，错误只体现在响应体 `code`。
