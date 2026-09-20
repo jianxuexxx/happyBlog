@@ -1,0 +1,10 @@
+# 测试 profile。
+# 现有测试全部以 @WebMvcTest 或纯单元测试运行，不加载完整上下文，
+# 因此这里显式排除数据源与 Redis 自动配置，防止将来误加 @SpringBootTest 时
+# 因缺少真实连接而失败。
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration

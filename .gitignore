@@ -22,3 +22,8 @@ backend/target/
 Thumbs.db
 *.log
 .tmp/
+
+# 后端
+backend/target/
+backend/config/
+*.log
