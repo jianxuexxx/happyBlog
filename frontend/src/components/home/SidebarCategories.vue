@@ -121,8 +121,11 @@ onMounted(load)
   text-align: center;
   padding: 1px 8px;
   border-radius: 999px;
-  background: var(--brand-secondary-soft);
-  color: var(--text-secondary);
+  /* 底色与字色都取「不随亮暗翻转」的品牌令牌（--brand-* 在 :root.dark 里未被覆盖），
+     与 Home.vue 的 .tag-chip 同款。别改用 --text-secondary/--text-primary：它们会翻成浅色，
+     压在这块浅底上对比度掉到 1.13/1.03，暗色下等于看不见（浏览器实测值）。 */
+  background: var(--brand-accent-soft);
+  color: var(--brand-primary);
   font-size: 11px;
 }
 </style>
