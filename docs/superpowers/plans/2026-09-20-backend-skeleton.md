@@ -469,13 +469,19 @@ class ResultCodeTest {
 }
 ```
 
-- [ ] **步骤 10：运行测试验证失败（编译不过 → 证明测试真的在跑）**
+- [ ] **步骤 10：运行测试，验证工具链与依赖解析**
 
 运行：
 ```bash
 cd D:/projects/myblog/backend && JAVA_HOME=/e/works/jdk21 PATH=/e/works/jdk21/bin:$PATH /e/works/apache-maven-3.8.6-bin/apache-maven-3.8.6/bin/mvn -q test -Dtest=ResultCodeTest
 ```
-预期：**首次运行会下载依赖（可能数分钟）**，随后 FAIL —— 因为 `ResultTest` 尚未创建、`Result` 虽已存在但测试尚未编写。若此时编译失败在 `Result`/`ResultCode` 上，说明步骤 2-3 的代码有误，先修。
+预期：**首次运行会下载全部依赖（可能数分钟）**，随后 PASS（2 个用例）。
+
+本步骤**不是** TDD 的「先看它失败」环节 —— 错误码取值由前端 `http.ts` 这份外部契约规定，测试在这里的作用是**锁死规格**，而非驱动新行为，所以它一开始就会通过。这一步真正要验证的是**工具链**：Maven + JDK21 + 私有镜像 + 全部依赖版本能否协同工作。这是本任务风险最高的一环，因此在写更多代码之前先跑通它。
+
+> 若报 `Blocked mirror for repositories` —— 说明 Maven 走了 http 拦截分支。检查是否有人改了 `~/.m2/settings.xml`；**不要自己改 settings**，把错误原文回报给用户。
+>
+> 若报 `release version 21 not supported` 或类似 —— `JAVA_HOME` 没生效，检查上面命令的内联前缀是否漏了。
 
 - [ ] **步骤 11：编写测试 `ResultTest.java`**
 
@@ -536,8 +542,6 @@ class ResultTest {
 cd D:/projects/myblog/backend && JAVA_HOME=/e/works/jdk21 PATH=/e/works/jdk21/bin:$PATH /e/works/apache-maven-3.8.6-bin/apache-maven-3.8.6/bin/mvn -q test -Dtest='ResultCodeTest,ResultTest'
 ```
 预期：PASS，2 个测试类共 6 个用例通过。
-
-> 若报 `Blocked mirror for repositories` —— 说明 Maven 走了 http 拦截分支。检查是否有人改了 `~/.m2/settings.xml`；**不要自己改 settings**，把错误原文回报给用户。
 
 - [ ] **步骤 13：更新 `.gitignore`**
 
@@ -2082,7 +2086,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 ```bash
 cd D:/projects/myblog/backend && JAVA_HOME=/e/works/jdk21 PATH=/e/works/jdk21/bin:$PATH /e/works/apache-maven-3.8.6-bin/apache-maven-3.8.6/bin/mvn -q test
 ```
-预期：PASS。已有 6 个测试类通过（ResultCode、Result、GlobalExceptionHandler、AuditMetaObjectHandler、CacheUtil、JwtUtil、AdminTokenStore、AdminAuthInterceptor —— 共 8 个）。
+预期：PASS。此时已有 8 个测试类通过：ResultCodeTest、ResultTest、GlobalExceptionHandlerTest、AuditMetaObjectHandlerTest、CacheUtilTest、JwtUtilTest、AdminTokenStoreTest、AdminAuthInterceptorTest。
 
 - [ ] **步骤 7：Commit**
 
