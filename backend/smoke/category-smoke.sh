@@ -268,7 +268,7 @@ echo "步骤 8：列表应反映更新（验证缓存失效确实生效）"
 LIST_BODY_2=$(curl -s "$BASE/api/category/list")
 NEW_HIT=$(echo "$LIST_BODY_2" | jq -r --arg n "${CATEGORY_NAME}改" '.data[] | select(.categoryName==$n) | .categoryId')
 OLD_HIT=$(echo "$LIST_BODY_2" | jq -r --arg n "$CATEGORY_NAME" '.data[] | select(.categoryName==$n) | .categoryId')
-if [ "$NEW_HIT" = "$CATEGORY_ID" ] && [ -z "$OLD_HIT" ]; then
+if [ -n "$CATEGORY_ID" ] && [ "$NEW_HIT" = "$CATEGORY_ID" ] && [ -z "$OLD_HIT" ]; then # 前置 -n 守卫：步骤 5 失败时 CATEGORY_ID 为空、NEW_HIT 必也为空，[ "" = "" ] 会假通过
   echo "  [通过] 新名称已生效、旧名称已消失（blog:category:list 缓存已被清除）"
   pass_count=$((pass_count + 1))
 else
