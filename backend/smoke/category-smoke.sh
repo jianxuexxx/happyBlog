@@ -58,11 +58,12 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 BASE="${BASE:-http://localhost:18088}"
-# 可用环境变量覆盖，脚本本身不落凭据：
-#   ADMIN_PASS=你的密码 ./category-smoke.sh
-# 默认值与 application.yml 的 ${BLOG_ADMIN_USERNAME:admin} / ${BLOG_ADMIN_PASSWORD:admin123} 一致。
-ADMIN_USER="${ADMIN_USER:-admin}"
-ADMIN_PASS="${ADMIN_PASS:-admin123}"
+# 凭据硬编码（用户 2026-09-20 裁定：脚本不读环境变量），下面两行是唯一事实来源。
+# 取值须与 config/application-local.yml 里实际生效的 admin 账号一致；改密码时只改这两行。
+# 注意 application.yml 的 ${BLOG_ADMIN_PASSWORD:admin123} 只是默认占位值，不是本机生效值 ——
+# 照着它试必然吃 40101，别再从那里找密码。
+ADMIN_USER="admin"
+ADMIN_PASS="admin"
 CATEGORY_NAME="冒烟测试分类"
 # OpenAPI 元信息期望值，取自 com.blog.config.OpenApiConfig
 EXPECTED_API_TITLE="我的博客系统 API"
@@ -176,9 +177,9 @@ if [ -z "$TOKEN" ]; then
   echo "            说明服务不可达：先确认应用已在 $BASE 上监听、且 BASE 与实际端口一致，"
   echo "            再确认 application-local.yml 的 profile 已激活。"
   echo "         2) 凭据不对——application-local.yml 里的 blog.admin.username /"
-  echo "            blog.admin.password 与脚本传入的（当前 $ADMIN_USER）不一致。"
-  echo "            脚本默认 admin/admin123，可用环境变量覆盖（脚本里不落凭据）："
-  echo "            ADMIN_USER=xxx ADMIN_PASS=xxx ./category-smoke.sh"
+  echo "            blog.admin.password 与脚本里的 ADMIN_USER/ADMIN_PASS 不一致。"
+  echo "            脚本凭据写死在脚本头部（ADMIN_USER=\"$ADMIN_USER\" / ADMIN_PASS=*** 两行），"
+  echo "            脚本不读环境变量，改密码请直接改那两行。"
   exit 1
 fi
 
