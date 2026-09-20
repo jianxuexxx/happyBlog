@@ -151,6 +151,14 @@ com.blog
 - 失败时 `data` 为 `null`
 - 前端响应拦截器对 **`code === 40100`** 有特殊处理（清 `localStorage` 的 `blog-admin-token`），因此 token 失效**必须**返回 40100
 
+### 【关键契约】HTTP 状态码一律 200
+
+**所有响应——含鉴权失败——HTTP 状态码一律返回 `200`，错误信息只体现在响应体的 `code` 字段。**
+
+依据：`frontend/src/api/http.ts:29-39` 中，对 `40100` 的处理写在 axios 响应拦截器的**成功回调**里（第一个函数参数），错误回调只做 `Promise.reject`。axios 默认 `validateStatus` 为 2xx，因此若后端对未授权请求返回 HTTP 401，axios 会走错误分支，**前端清理 `blog-admin-token` 的逻辑永远不会执行**，表现为「token 过期后卡在管理页反复请求失败，不跳登录」。
+
+这条约束对所有非 2xx 语义的错误码（40100 / 40101 / 40400 / 50000 等）一体适用：`AdminAuthInterceptor` 拒绝请求时写 HTTP 200 + `{"code":40100,...}`，`GlobalExceptionHandler` 亦不设置非 200 状态码。
+
 ### 错误码（`ResultCode` 枚举）
 
 | 码 | 含义 | 来源 |
@@ -370,7 +378,7 @@ ORDER BY c.sortOrder ASC, c.categoryId ASC
 | `JwtUtilTest` | 纯单元 | 签发后可校验通过；篡改后校验失败；过期 token 校验失败 |
 | `GlobalExceptionHandlerTest` | 直接调用 handler 方法 | `BizException` → 对应码；`RuntimeException` → 50000 且 `message` 不含堆栈信息 |
 | `ResultCodeTest` | 纯单元 | 断言各错误码取值与 §6 表格一致（防回归） |
-| `CategoryControllerTest` | `@WebMvcTest` + `@MockitoBean` service | `GET /api/category/list` → `$.code=0` 且 `$.data[0].articleCount` 存在；`POST /api/admin/category` 无 token → `$.code=40100` |
+| `CategoryControllerTest` | `@WebMvcTest` + `@MockitoBean` service | `GET /api/category/list` → `$.code=0` 且 `$.data[0].articleCount` 存在；`POST /api/admin/category` 无 token → **HTTP 200** 且 `$.code=40100`（`status().isOk()` 是断言的一部分，防止有人「顺手」改成 401） |
 | `AdminAuthControllerTest` | `@WebMvcTest` + `@MockitoBean` service | 登录契约 `$.code=0` 且 `$.data.token` 存在 |
 
 **注意事项：**
