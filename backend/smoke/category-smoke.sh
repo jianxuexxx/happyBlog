@@ -58,6 +58,9 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 BASE="${BASE:-http://localhost:18088}"
+# 可用环境变量覆盖，脚本本身不落凭据：
+#   ADMIN_PASS=你的密码 ./category-smoke.sh
+# 默认值与 application.yml 的 ${BLOG_ADMIN_USERNAME:admin} / ${BLOG_ADMIN_PASSWORD:admin123} 一致。
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin123}"
 CATEGORY_NAME="冒烟测试分类"
@@ -80,6 +83,22 @@ EXPECTED_API_TITLE="我的博客系统 API"
 #
 # --connect-timeout 5 只覆盖「连不上」的场景（端口没起），与上面的 30s 无关。
 CURL_OPTS=(--max-time 60 --connect-timeout 5)
+
+# ---------------------------------------------------------------------------
+# 【Windows/Git Bash 编码契约】请求体一律走 `--data-binary @-` 从 stdin 送入，
+# 绝不用 `-d '...'`。原因（本机实测字节，不是推测）：
+#   Git Bash 的 curl 是原生 mingw 程序（x86_64-w64-mingw32）。MSYS2 运行时在
+#   exec 原生程序时会把 argv 从 UTF-8 转成系统 ANSI 代码页（本机 936/GBK）；
+#   文件与 stdin 不经这条通路。于是同一个请求体到线上是两种字节：
+#     -d '…冒烟测试分类…'        → c3 b0 d1 cc b2 e2 ca d4 b7 d6 c0 e0（GBK）
+#     --data-binary @- <<<"…"   → e5 86 92 e7 83 9f e6 b5 8b e8 af 95 …（UTF-8）
+#   服务端按 UTF-8 解码那份 GBK 字节必然失败，报的正是你会在日志里看到的
+#   「JSON parse error: Invalid UTF-8 middle byte 0xcc」——
+#   那个 cc 就是「烟」的 GBK 尾字节 d1 cc。后果是请求体被整个丢弃，
+#   接口回 40001 请求体格式错误，而它看起来像「后端校验不过」，极易误判。
+#   `<<<` 是 bash 进程内机制，不经过 argv，故安全（只多一个尾换行，JSON 无碍）。
+#   实测边界：jq --arg 传中文**不受影响**（比对仍为 true），本契约只约束 curl 请求体。
+# 新增任何带中文（或将来可能带中文）的请求体，一律照抄 <<<"..." 的写法。
 
 pass_count=0
 fail_count=0
@@ -145,7 +164,7 @@ echo "步骤 1：管理员登录"
 LOGIN_FILE=$(mktemp)
 LOGIN_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$LOGIN_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/login" \
   -H 'Content-Type: application/json' \
-  -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}")
+  --data-binary @- <<<"{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}")
 LOGIN_BODY=$(cat "$LOGIN_FILE")
 rm -f "$LOGIN_FILE"
 echo "  （HTTP 状态码 = $LOGIN_HTTP；000 表示连不上服务）"
@@ -158,6 +177,8 @@ if [ -z "$TOKEN" ]; then
   echo "            再确认 application-local.yml 的 profile 已激活。"
   echo "         2) 凭据不对——application-local.yml 里的 blog.admin.username /"
   echo "            blog.admin.password 与脚本传入的（当前 $ADMIN_USER）不一致。"
+  echo "            脚本默认 admin/admin123，可用环境变量覆盖（脚本里不落凭据）："
+  echo "            ADMIN_USER=xxx ADMIN_PASS=xxx ./category-smoke.sh"
   exit 1
 fi
 
@@ -170,7 +191,7 @@ echo "步骤 2：不带 token 访问管理端接口"
 NO_TOKEN_FILE=$(mktemp)
 NO_TOKEN_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$NO_TOKEN_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
-  -d "{\"categoryName\":\"$CATEGORY_NAME\"}")
+  --data-binary @- <<<"{\"categoryName\":\"$CATEGORY_NAME\"}")
 NO_TOKEN_RESP=$(cat "$NO_TOKEN_FILE")
 rm -f "$NO_TOKEN_FILE"
 
@@ -224,7 +245,7 @@ echo "步骤 4：用错误的密码登录"
 WRONG_PASS_FILE=$(mktemp)
 WRONG_PASS_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$WRONG_PASS_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/login" \
   -H 'Content-Type: application/json' \
-  -d "{\"username\":\"$ADMIN_USER\",\"password\":\"__smoke_test_wrong_password__\"}")
+  --data-binary @- <<<"{\"username\":\"$ADMIN_USER\",\"password\":\"__smoke_test_wrong_password__\"}")
 WRONG_PASS_BODY=$(cat "$WRONG_PASS_FILE")
 rm -f "$WRONG_PASS_FILE"
 
@@ -244,7 +265,7 @@ echo "步骤 5：带 token 新增分类「$CATEGORY_NAME」"
 CREATE_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d "{\"categoryName\":\"$CATEGORY_NAME\",\"sortOrder\":99}")
+  --data-binary @- <<<"{\"categoryName\":\"$CATEGORY_NAME\",\"sortOrder\":99}")
 expect_code "新增分类" "$CREATE_BODY" "0"
 CATEGORY_ID=$(echo "$CREATE_BODY" | jq -r '.data // empty')
 echo "         新建的 categoryId = $CATEGORY_ID"
@@ -285,7 +306,7 @@ echo "步骤 7：更新分类名称与排序"
 UPDATE_BODY=$(curl -s "${CURL_OPTS[@]}" -X PUT "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d "{\"categoryId\":$CATEGORY_ID,\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":1}")
+  --data-binary @- <<<"{\"categoryId\":$CATEGORY_ID,\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":1}")
 expect_code "更新分类" "$UPDATE_BODY" "0"
 
 # ---------------------------------------------------------------
@@ -308,7 +329,7 @@ echo "步骤 7b：分类名原样不变、只改排序（自排除谓词的真�
 SAME_NAME_BODY=$(curl -s "${CURL_OPTS[@]}" -X PUT "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d "{\"categoryId\":$CATEGORY_ID,\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":3}")
+  --data-binary @- <<<"{\"categoryId\":$CATEGORY_ID,\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":3}")
 expect_code "只改排序、分类名原样回传（自排除生效，不应报 40002 重名）" "$SAME_NAME_BODY" "0"
 
 # 上面只有 code=0 还证明不了「这次写真的落库了」：若 updateById 变成空操作，
@@ -349,7 +370,7 @@ echo "步骤 9：重复新增同名分类"
 DUP_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d "{\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":2}")
+  --data-binary @- <<<"{\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":2}")
 expect_code "重名校验" "$DUP_BODY" "40002"
 
 # ---------------------------------------------------------------
@@ -387,7 +408,7 @@ echo "步骤 12：用同一个 categoryName 再次新增（删后同名可重建
 REBUILD_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d "{\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":2}")
+  --data-binary @- <<<"{\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":2}")
 expect_code "删后同名重建" "$REBUILD_BODY" "0"
 CATEGORY_ID_2=$(echo "$REBUILD_BODY" | jq -r '.data // empty')
 echo "         重建的 categoryId = $CATEGORY_ID_2"
@@ -422,7 +443,7 @@ echo "步骤 15：用登出前的 token 再次访问管理端"
 AFTER_LOGOUT_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d "{\"categoryName\":\"登出后不应创建成功\"}")
+  --data-binary @- <<<"{\"categoryName\":\"登出后不应创建成功\"}")
 expect_code "登出后 token 立即失效" "$AFTER_LOGOUT_BODY" "40100"
 
 # ---------------------------------------------------------------
