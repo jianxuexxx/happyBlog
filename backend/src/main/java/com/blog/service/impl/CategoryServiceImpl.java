@@ -95,8 +95,10 @@ public class CategoryServiceImpl implements CategoryService {
 
     /**
      * 分类名是否已被占用。
-     * excludeId 用于更新场景排除自身。已逻辑删除的记录不参与判重，
-     * 因此删掉分类后可以同名重建（设计规格 §4 唯一键与 deleted 组合的意图）。
+     * excludeId 用于更新场景排除自身。
+     * 唯一性只由本方法保证：category 表刻意不建唯一索引（「列 + deleted」的组合唯一键只能
+     * 容纳一行 deleted=1，撑不起删除历史，同名记录的第二次逻辑删除会抛 MySQL 1062）。
+     * 已逻辑删除的记录不参与判重，因此删掉分类后可以同名重建（设计规格 §4）。
      */
     private boolean existsByName(String categoryName, Long excludeId) {
         LambdaQueryWrapper<Category> wrapper = Wrappers.<Category>lambdaQuery()
