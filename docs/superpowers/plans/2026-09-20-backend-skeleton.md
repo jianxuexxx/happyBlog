@@ -370,10 +370,13 @@ server:
 spring:
   application:
     name: myblog-backend
-  # 加载 backend/config/ 下的本地配置（application-local.yml，已 gitignore）。
-  # 相对路径基于启动时的工作目录，因此必须在 backend/ 目录下启动。
+  # 加载本地配置文件 backend/config/application-local.yml（已 gitignore，交付用户填写）。
+  # 必须用 spring.config.import —— spring.config.additional-location 一族（含 name/location）
+  # 按官方文档必须在环境变量 / 系统属性 / 命令行参数中定义，写在 application.yml 里【静默失效】。
+  # import 只能指向文件、不能指向目录；被导入文件的值优先于本文件。
+  # 路径相对启动时的工作目录，因此必须在 backend/ 目录下启动；文件不存在时静默跳过。
   config:
-    additional-location: optional:file:./config/
+    import: optional:file:./config/application-local.yml
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/myblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     username: ${DB_USERNAME:root}
@@ -386,7 +389,10 @@ spring:
       password: ${REDIS_PASSWORD:}
       database: 0
   jackson:
-    date-format: yyyy-MM-dd HH:mm:ss
+    # 注意：不要在这里配 spring.jackson.date-format —— 它只作用于 java.util.Date，
+    # 对本项目大量使用的 java.time.LocalDateTime 无效（会输出 ISO-8601）。
+    # 将来 article 接口涉及时间字段时，用 @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    # 或注册 Jackson2ObjectMapperBuilderCustomizer，别依赖那个属性。
     time-zone: Asia/Shanghai
 
 mybatis-plus:
@@ -3507,8 +3513,14 @@ CREATE TABLE IF NOT EXISTS `notice` (
 ```yaml
 # 本地开发配置 —— 此文件已被 .gitignore 排除，不会进版本库。
 # Spring Boot 通过 application.yml 里的
-#   spring.config.additional-location=optional:file:./config/
-# 自动加载本文件（相对启动时的工作目录，因此必须在 backend/ 目录下启动）。
+#   spring.config.import: optional:file:./config/application-local.yml
+# 加载本文件。
+#
+# 两个注意点：
+#   1. 路径相对【启动时的工作目录】解析，所以必须在 backend/ 目录下启动后端，
+#      否则会去找 <仓库根>/config/application-local.yml 而找不到。
+#   2. 文件名必须正好是 application-local.yml —— import 指向的是确切文件，不是目录。
+#      若文件名写错，Spring 会静默跳过（optional: 前缀），配置悄悄回落到默认值。
 #
 # 用法：把下面的值改成你本机 MySQL / Redis 的真实连接信息。
 
