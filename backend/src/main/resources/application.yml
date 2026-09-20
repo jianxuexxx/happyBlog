@@ -4,10 +4,14 @@ server:
 spring:
   application:
     name: myblog-backend
-  # 加载 backend/config/ 下的本地配置（application-local.yml，已 gitignore）。
-  # 相对路径基于启动时的工作目录，因此必须在 backend/ 目录下启动。
+  # 加载本地配置单文件 backend/config/application-local.yml（已 gitignore）。
+  # 用 import 而非 additional-location：spring.config.additional-location 必须在
+  # application.yml 被读取之前（环境变量 / 系统属性 / 命令行参数）定义，写在这里不生效。
+  # 注意 import 只能指向文件，不能指向目录。
+  # 相对路径基于启动时的工作目录，因此必须在 backend/ 目录下启动；文件不存在时静默跳过。
+  # 被导入文件的值优先于本文件。
   config:
-    additional-location: optional:file:./config/
+    import: optional:file:./config/application-local.yml
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/myblog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     username: ${DB_USERNAME:root}
@@ -20,7 +24,10 @@ spring:
       password: ${REDIS_PASSWORD:}
       database: 0
   jackson:
-    date-format: yyyy-MM-dd HH:mm:ss
+    # 不设置 date-format：它只作用于 java.util.Date（本项目几乎不用），
+    # 对 java.time.LocalDateTime 无效，是「看似生效实则不生效」的静默陷阱。
+    # 将来 article 接口涉及时间字段时，用 @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    # 或注册 Jackson2ObjectMapperBuilderCustomizer，不要依赖 date-format 属性。
     time-zone: Asia/Shanghai
 
 mybatis-plus:
