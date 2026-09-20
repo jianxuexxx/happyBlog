@@ -43,7 +43,10 @@ mybatis-plus:
     # underCamel），主键与表名因 @TableId(value=...) / @TableName(...) 显式给值而幸免。
     # 回归护栏见 ColumnNamingConventionTest。
     map-underscore-to-camel-case: false
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # log-impl 刻意不在此设置：StdOutImpl 会把每条 SQL 连参数打到标准输出，而本文件随
+    # 生产包一起上线，等于让生产环境持续刷日志。本地要看 SQL，在 config/application-local.yml
+    # 里自行加（该文件不被 git 跟踪，不会带到生产）：
+    #   mybatis-plus.configuration.log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     banner: false
     db-config:
