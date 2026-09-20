@@ -13,11 +13,11 @@
 --   4. createdAt/updatedAt 的 DEFAULT / ON UPDATE 是兜底（手工 SQL 插入场景），
 --      应用层由 MyBatis-Plus 的 MetaObjectHandler 填充
 
-CREATE DATABASE IF NOT EXISTS `myblog`
+CREATE DATABASE IF NOT EXISTS `happyblog`
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_0900_ai_ci;
 
-USE `myblog`;
+USE `happyblog`;
 
 -- ---------------------------------------------------------------
 -- article 文章表
