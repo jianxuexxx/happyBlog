@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import CarouselHero from '../components/home/CarouselHero.vue'
+import SidebarCategories from '../components/home/SidebarCategories.vue'
 import SidebarRecommended from '../components/home/SidebarRecommended.vue'
 import NoticeFloat from '../components/home/NoticeFloat.vue'
 
@@ -45,8 +46,9 @@ function toggleExpand() {
       </div>
 
       <div class="home-grid">
-        <!-- 左侧栏展位：推荐文章 -->
+        <!-- 左侧栏展位：分类（真实数据，接后端）+ 推荐文章（占位） -->
         <aside class="home-sidebar">
+          <SidebarCategories />
           <SidebarRecommended />
         </aside>
 
@@ -145,6 +147,10 @@ function toggleExpand() {
 .home-sidebar {
   position: sticky;
   top: 80px;
+  /* 侧栏多张卡片纵向排布，间距走 8pt 栅格 */
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
 }
 
 .section-title {
