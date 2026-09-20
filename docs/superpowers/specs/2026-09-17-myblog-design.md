@@ -233,7 +233,10 @@ PUT  /api/admin/site/config          保存站点配置
 
 ## 10. 错误处理
 
-- 全局 `@RestControllerAdvice`：`BizException` → 业务码+消息；通用异常 → code:50000 + 友好消息（不泄漏堆栈）
+- 全局 `@RestControllerAdvice`，分两层：
+  - **客户端错误**（可预料，前端能自行纠正）→ 4xxxx + WARN，不打堆栈。含：`BizException` → 业务码+消息；JSR-380 校验失败 → 40001；路径不存在（`NoResourceFoundException`，Boot 3.2+）→ 40400；请求方法不匹配、请求体畸形、路径变量类型不符 → 40001 + 具体文案
+  - **未预期异常** → code:50000 + 固定友好消息（不泄漏堆栈），完整堆栈只进 ERROR 日志
+  - 不加这层区分的话，404/405/畸形请求体都会被误报成「服务器开小差了」，且每个 favicon 请求/扫描器探测都刷一条 ERROR 堆栈
 - 参数校验 JSR-380 → code:400xx
 - 404（文章不存在/已删/私密）→ code:40400，前台跳 404
 - 登录失败 code:40101；Token 无效/过期 code:40100，前端 401 拦截跳登录
