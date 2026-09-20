@@ -9,6 +9,8 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.blog.common.BizException;
 import com.blog.dto.CategorySaveDTO;
 import com.blog.dto.CategoryVO;
@@ -18,10 +20,12 @@ import com.blog.mapper.CategoryMapper;
 import com.blog.util.CacheUtil;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -172,6 +176,41 @@ class CategoryServiceImplTest {
 
         verify(categoryMapper).updateById(any(Category.class));
         verify(cacheUtil).delete("blog:category:list");
+    }
+
+    @Test
+    @DisplayName("更新：重名判定的 SQL 必须带自排除谓词（名字原样回传时不能误报 40002）")
+    void updateExcludesSelfFromNameConflictCheck() {
+        // 本用例补的是既有 5 处 selectCount 打桩留下的覆盖缺口：那些用例把 selectCount
+        // 整个打桩成固定值（0 或 1），于是 existsByName 拼出来的 Wrapper「一个字都没被断言」——
+        // 把 .eq(...) 或 .ne(...) 整个删掉，其余用例依然全绿。
+        // 这里在打桩的同时把实参捕获出来，对 Wrapper 本身下断言。
+        Category existing = new Category();
+        existing.setCategoryId(9L);
+        given(categoryMapper.selectById(9L)).willReturn(existing);
+        given(categoryMapper.selectCount(any())).willReturn(0L);
+
+        service.update(saveDto(9L, "技术", 3));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<Category>> captor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(categoryMapper).selectCount(captor.capture());
+        AbstractWrapper<Category, ?, ?> wrapper = (AbstractWrapper<Category, ?, ?>) captor.getValue();
+
+        // 谓词形状：既要按名字判重，又要排除自身。少任何一半都必须红。
+        String sql = wrapper.getTargetSql();
+        assertThat(sql)
+                .as("判重 SQL 必须同时含 categoryName 与自排除的 <>，实际为: %s", sql)
+                .contains("categoryName")
+                .contains("<>");
+
+        // 参数值：确认 eq 绑的是「被编辑后的名字」、ne 绑的是「被编辑的那条记录 id」，
+        // 避免出现「<> 有了但绑错参数」这种形状对、语义错的写法。
+        Map<String, Object> params = wrapper.getParamNameValuePairs();
+        assertThat(params.values())
+                .as("判重 SQL 的参数值: %s", params)
+                .contains("技术")
+                .contains(9L);
     }
 
     @Test

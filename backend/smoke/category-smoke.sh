@@ -64,6 +64,23 @@ CATEGORY_NAME="冒烟测试分类"
 # OpenAPI 元信息期望值，取自 com.blog.config.OpenApiConfig
 EXPECTED_API_TITLE="我的博客系统 API"
 
+# ---------------------------------------------------------------------------
+# curl 统一超时参数：下面每一处 curl 调用都必须带上它（新增调用同理），
+# 请勿在任何调用点另写超时，否则「集中一处可审计」的意图就失效了。
+#
+# 为什么 --max-time 必须是 60，而不是 10 这种「看起来更快失败」的值：
+#   curl 对「TCP 已连上但服务端一直不响应」没有默认超时，会永久挂起。
+#   本应用要连 MySQL/Redis，数据库不可达时 Hikari 连接池正处于
+#   「已接受连接、然后不吭声」的状态，而 Hikari 的 connectionTimeout
+#   默认就是 30 秒 —— 应用要等到第 30 秒才会用 code=50000 明确报错。
+#   若把 --max-time 设成小于 30s 的值，curl 会在应用还来不及响应时就掐断连接，
+#   断言此刻拿到的响应体是空字符串，于是打出一个空的 code= ，
+#   把「响亮的错误」变成「误导性的空值」。故 60 必须 >= Hikari 的 30s。
+#   若将来 Hikari connectionTimeout 调大，这里要同步调大到「它 + 余量」。
+#
+# --connect-timeout 5 只覆盖「连不上」的场景（端口没起），与上面的 30s 无关。
+CURL_OPTS=(--max-time 60 --connect-timeout 5)
+
 pass_count=0
 fail_count=0
 
@@ -123,14 +140,24 @@ echo "=========================================="
 echo
 echo "步骤 1：管理员登录"
 # 预期：code=0，data.token 为非空字符串
-LOGIN_BODY=$(curl -s -X POST "$BASE/api/admin/login" \
+# 这里额外把 HTTP 状态码打出来：下面「未取到 token」的致命提示要靠它区分
+# 「服务不可达（000）」与「凭据不对（200 + code=40101）」，不打印的话用户无法自查。
+LOGIN_FILE=$(mktemp)
+LOGIN_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$LOGIN_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/login" \
   -H 'Content-Type: application/json' \
   -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}")
+LOGIN_BODY=$(cat "$LOGIN_FILE")
+rm -f "$LOGIN_FILE"
+echo "  （HTTP 状态码 = $LOGIN_HTTP；000 表示连不上服务）"
 expect_code "登录成功" "$LOGIN_BODY" "0"
 TOKEN=$(echo "$LOGIN_BODY" | jq -r '.data.token // empty')
 if [ -z "$TOKEN" ]; then
-  echo "  [致命] 未取到 token，后续步骤无法继续。请确认 application-local.yml 里的"
-  echo "         blog.admin.username / blog.admin.password 与脚本传入的一致。"
+  echo "  [致命] 未取到 token，后续步骤无法继续。有两类常见原因，请按顺序排查："
+  echo "         1) 后端没起来 / 地址不对（最常见）——若上面 HTTP 为 000 或响应体为空，"
+  echo "            说明服务不可达：先确认应用已在 $BASE 上监听、且 BASE 与实际端口一致，"
+  echo "            再确认 application-local.yml 的 profile 已激活。"
+  echo "         2) 凭据不对——application-local.yml 里的 blog.admin.username /"
+  echo "            blog.admin.password 与脚本传入的（当前 $ADMIN_USER）不一致。"
   exit 1
 fi
 
@@ -141,7 +168,7 @@ echo "步骤 2：不带 token 访问管理端接口"
 # 这条同时验证两件事：鉴权确实拦住了，且拒绝时没有返回 HTTP 401
 # （前端 axios 只在成功回调里读 40100，返回 401 会让前端清理登录态的逻辑失效）
 NO_TOKEN_FILE=$(mktemp)
-NO_TOKEN_HTTP=$(curl -s -o "$NO_TOKEN_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/category" \
+NO_TOKEN_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$NO_TOKEN_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -d "{\"categoryName\":\"$CATEGORY_NAME\"}")
 NO_TOKEN_RESP=$(cat "$NO_TOKEN_FILE")
@@ -153,6 +180,7 @@ if [ "$NO_TOKEN_HTTP" = "200" ]; then
 else
   echo "  [失败] 无 token 请求返回 HTTP $NO_TOKEN_HTTP，期望 200"
   echo "         若为 401，说明拦截器用了 response.setStatus(401) —— 必须改回 200"
+  echo "         若为 000，说明服务不可达（后端没起来或 BASE=$BASE 不对），本步结论不成立"
   fail_count=$((fail_count + 1))
 fi
 expect_code "无 token 被拒" "$NO_TOKEN_RESP" "40100"
@@ -165,7 +193,7 @@ echo "步骤 3：拉取 OpenAPI 文档元信息"
 # OpenApiConfig 的产出此前零验证，而「交付 API 文档（可导入 Apifox）」是
 # 任务 10 提交信息里写明的目标，故在此补上端到端验证。
 API_DOCS_FILE=$(mktemp)
-API_DOCS_HTTP=$(curl -s -o "$API_DOCS_FILE" -w '%{http_code}' "$BASE/v3/api-docs")
+API_DOCS_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$API_DOCS_FILE" -w '%{http_code}' "$BASE/v3/api-docs")
 API_DOCS_BODY=$(cat "$API_DOCS_FILE")
 rm -f "$API_DOCS_FILE"
 
@@ -194,7 +222,7 @@ echo "步骤 4：用错误的密码登录"
 # 这条具体路径（登录失败）此前没有任何用例走过，而它是前端登录页的主路径：
 # 前端同样只在成功回调里读业务码，故 HTTP 状态必须是 200。
 WRONG_PASS_FILE=$(mktemp)
-WRONG_PASS_HTTP=$(curl -s -o "$WRONG_PASS_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/login" \
+WRONG_PASS_HTTP=$(curl -s "${CURL_OPTS[@]}" -o "$WRONG_PASS_FILE" -w '%{http_code}' -X POST "$BASE/api/admin/login" \
   -H 'Content-Type: application/json' \
   -d "{\"username\":\"$ADMIN_USER\",\"password\":\"__smoke_test_wrong_password__\"}")
 WRONG_PASS_BODY=$(cat "$WRONG_PASS_FILE")
@@ -213,7 +241,7 @@ expect_code "密码错误被拒" "$WRONG_PASS_BODY" "40101"
 echo
 echo "步骤 5：带 token 新增分类「$CATEGORY_NAME」"
 # 预期：code=0，data 为新建的 categoryId（正整数）
-CREATE_BODY=$(curl -s -X POST "$BASE/api/admin/category" \
+CREATE_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d "{\"categoryName\":\"$CATEGORY_NAME\",\"sortOrder\":99}")
@@ -228,7 +256,7 @@ echo "步骤 6：公开列表应含该分类且 articleCount=0"
 # 【证据一】下面这次 GET /api/category/list 的成功本身即证明：
 #   应用真的起来了 + CategoryMapper 注入成功 + 7 个 Mapper 均已注册
 #   （@MapperScan 位于 MybatisPlusConfig 的等价性，见文件头说明）。
-LIST_BODY=$(curl -s "$BASE/api/category/list")
+LIST_BODY=$(curl -s "${CURL_OPTS[@]}" "$BASE/api/category/list")
 expect_code "查询列表" "$LIST_BODY" "0"
 COUNT=$(echo "$LIST_BODY" | jq -r --arg n "$CATEGORY_NAME" '.data[] | select(.categoryName==$n) | .articleCount')
 if [ "$COUNT" = "0" ]; then
@@ -254,7 +282,7 @@ expect_bool "新建的分类出现在公开列表中（categoryId=$CATEGORY_ID �
 echo
 echo "步骤 7：更新分类名称与排序"
 # 预期：code=0
-UPDATE_BODY=$(curl -s -X PUT "$BASE/api/admin/category" \
+UPDATE_BODY=$(curl -s "${CURL_OPTS[@]}" -X PUT "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d "{\"categoryId\":$CATEGORY_ID,\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":1}")
@@ -262,10 +290,46 @@ expect_code "更新分类" "$UPDATE_BODY" "0"
 
 # ---------------------------------------------------------------
 echo
+echo "步骤 7b：分类名原样不变、只改排序（自排除谓词的真库验证）"
+# 预期：code=0，且列表里该分类的 sortOrder 确实变成了 3、名字仍是「…改」
+# 为什么必须单独有这一步（它是 .ne 自排除谓词唯一的活证据）：
+#   管理端最高频的编辑动作是「只改排序，分类名原样回传」。此时
+#   CategoryServiceImpl.existsByName 里那句 .ne(Category::getCategoryId, excludeId)
+#   是唯一的活路 —— 库里那一行的 categoryName 就是当前传进来的名字，
+#   一旦自排除谓词被删掉，这一次 update 会直接以 40002 失败。
+#   现有三层验证没有一层走过它：
+#     · 单测 CategoryServiceImplTest 把 selectCount 整个打桩成固定值，
+#       该谓词一个字都没被断言（删掉 .eq 或 .ne，全部用例仍全绿）；
+#     · 切片测试走的是 mock 掉的 Service，压根到不了这行；
+#     · 步骤 7 也覆盖不了 —— 那一步库里存的是「旧名」，
+#       带不带 .ne 查询结果都一样。
+#   只有等到步骤 7 已把「…改」落库、本步再原样回传一次，才真正走到自排除分支。
+#   mock 永远做不到这件事，只有真库能 —— 这正是本步存在的理由。
+SAME_NAME_BODY=$(curl -s "${CURL_OPTS[@]}" -X PUT "$BASE/api/admin/category" \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{\"categoryId\":$CATEGORY_ID,\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":3}")
+expect_code "只改排序、分类名原样回传（自排除生效，不应报 40002 重名）" "$SAME_NAME_BODY" "0"
+
+# 上面只有 code=0 还证明不了「这次写真的落库了」：若 updateById 变成空操作，
+# code 同样是 0。故再查一次列表，确认名字没被改坏、且 sortOrder 确实变成了 3。
+LIST_BODY_1B=$(curl -s "${CURL_OPTS[@]}" "$BASE/api/category/list")
+SAME_NAME_SORT=$(echo "$LIST_BODY_1B" | jq -r --arg n "${CATEGORY_NAME}改" '.data[] | select(.categoryName==$n) | .sortOrder')
+if [ "$SAME_NAME_SORT" = "3" ]; then
+  echo "  [通过] 仅改排序生效：名称仍为「${CATEGORY_NAME}改」，sortOrder 已变为 3"
+  pass_count=$((pass_count + 1))
+else
+  echo "  [失败] 期望「${CATEGORY_NAME}改」的 sortOrder=3，实际 '$SAME_NAME_SORT'"
+  echo "         为空说明该名称在列表中查不到（写坏了名字或缓存未清）"
+  fail_count=$((fail_count + 1))
+fi
+
+# ---------------------------------------------------------------
+echo
 echo "步骤 8：列表应反映更新（验证缓存失效确实生效）"
 # 预期：能找到新名称，且找不到旧名称
 # 【证据一】同上：这条成功的 GET /api/category/list 也是启动/DI/Mapper 注册的证据。
-LIST_BODY_2=$(curl -s "$BASE/api/category/list")
+LIST_BODY_2=$(curl -s "${CURL_OPTS[@]}" "$BASE/api/category/list")
 NEW_HIT=$(echo "$LIST_BODY_2" | jq -r --arg n "${CATEGORY_NAME}改" '.data[] | select(.categoryName==$n) | .categoryId')
 OLD_HIT=$(echo "$LIST_BODY_2" | jq -r --arg n "$CATEGORY_NAME" '.data[] | select(.categoryName==$n) | .categoryId')
 if [ -n "$CATEGORY_ID" ] && [ "$NEW_HIT" = "$CATEGORY_ID" ] && [ -z "$OLD_HIT" ]; then # 前置 -n 守卫：步骤 5 失败时 CATEGORY_ID 为空、NEW_HIT 必也为空，[ "" = "" ] 会假通过
@@ -273,6 +337,7 @@ if [ -n "$CATEGORY_ID" ] && [ "$NEW_HIT" = "$CATEGORY_ID" ] && [ -z "$OLD_HIT" ]
   pass_count=$((pass_count + 1))
 else
   echo "  [失败] 新名称命中='$NEW_HIT'（期望 $CATEGORY_ID），旧名称命中='$OLD_HIT'（期望空）"
+  echo "         若 CATEGORY_ID 为空，说明步骤 5 新增失败（该步已单独报过失败），本步结论不成立"
   echo "         若新名称未生效，说明写操作后没有清除缓存"
   fail_count=$((fail_count + 1))
 fi
@@ -281,7 +346,7 @@ fi
 echo
 echo "步骤 9：重复新增同名分类"
 # 预期：code=40002（分类名已存在）
-DUP_BODY=$(curl -s -X POST "$BASE/api/admin/category" \
+DUP_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d "{\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":2}")
@@ -293,7 +358,7 @@ echo "步骤 10：逻辑删除该分类"
 # 预期：code=0
 # 【局限二】删除的另一条副作用（文章 categoryId 置空）无法在此用 HTTP 断言，
 # 下方会打印需手工执行的 SQL —— 不要把它当成已覆盖。
-DELETE_BODY=$(curl -s -X DELETE "$BASE/api/admin/category/$CATEGORY_ID" \
+DELETE_BODY=$(curl -s "${CURL_OPTS[@]}" -X DELETE "$BASE/api/admin/category/$CATEGORY_ID" \
   -H "Authorization: Bearer $TOKEN")
 expect_code "删除分类" "$DELETE_BODY" "0"
 print_manual_article_check "$CATEGORY_ID"
@@ -302,7 +367,7 @@ print_manual_article_check "$CATEGORY_ID"
 echo
 echo "步骤 11：列表应不再包含该分类"
 # 预期：查不到该分类
-LIST_BODY_3=$(curl -s "$BASE/api/category/list")
+LIST_BODY_3=$(curl -s "${CURL_OPTS[@]}" "$BASE/api/category/list")
 GONE=$(echo "$LIST_BODY_3" | jq -r --arg n "${CATEGORY_NAME}改" '.data[] | select(.categoryName==$n) | .categoryId')
 if [ -z "$GONE" ]; then
   echo "  [通过] 已删除的分类不再出现在列表中"
@@ -319,7 +384,7 @@ echo "步骤 12：用同一个 categoryName 再次新增（删后同名可重建
 # 步骤 12+13 合起来是「不建唯一索引、唯一性由应用层保证」这一裁定的端到端验证，
 # 也是本次任务最有价值的一步。四步链路为：建（步骤 5+7）→ 删（步骤 10）
 # → 同名再建（本步）→ 再删（步骤 13），四步各自都有断言。
-REBUILD_BODY=$(curl -s -X POST "$BASE/api/admin/category" \
+REBUILD_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d "{\"categoryName\":\"${CATEGORY_NAME}改\",\"sortOrder\":2}")
@@ -338,7 +403,7 @@ echo "步骤 13：再次逻辑删除该分类（必须成功）"
 # 现在 category 表只有 KEY idx_category_categoryName(categoryName, deleted) 普通索引，
 # 唯一性由应用层 WHERE categoryName=? AND deleted=0 保证，故本步必须 code=0。
 # 返回任何非 0 code（尤其 1062）都说明唯一索引又回来了。
-DELETE_AGAIN_BODY=$(curl -s -X DELETE "$BASE/api/admin/category/$CATEGORY_ID_2" \
+DELETE_AGAIN_BODY=$(curl -s "${CURL_OPTS[@]}" -X DELETE "$BASE/api/admin/category/$CATEGORY_ID_2" \
   -H "Authorization: Bearer $TOKEN")
 expect_code "同名分类第二次删除" "$DELETE_AGAIN_BODY" "0"
 
@@ -346,7 +411,7 @@ expect_code "同名分类第二次删除" "$DELETE_AGAIN_BODY" "0"
 echo
 echo "步骤 14：登出"
 # 预期：code=0
-LOGOUT_BODY=$(curl -s -X POST "$BASE/api/admin/logout" \
+LOGOUT_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/logout" \
   -H "Authorization: Bearer $TOKEN")
 expect_code "登出" "$LOGOUT_BODY" "0"
 
@@ -354,7 +419,7 @@ expect_code "登出" "$LOGOUT_BODY" "0"
 echo
 echo "步骤 15：用登出前的 token 再次访问管理端"
 # 预期：code=40100（登出后 token 立即失效；仅靠 JWT 签名无法做到这点）
-AFTER_LOGOUT_BODY=$(curl -s -X POST "$BASE/api/admin/category" \
+AFTER_LOGOUT_BODY=$(curl -s "${CURL_OPTS[@]}" -X POST "$BASE/api/admin/category" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d "{\"categoryName\":\"登出后不应创建成功\"}")
@@ -372,8 +437,10 @@ cat <<SQL
 
   1) SELECT categoryId, categoryName, deleted FROM category
       WHERE categoryName IN ('$CATEGORY_NAME', '${CATEGORY_NAME}改');
-     预期：两行，categoryName 均为 '${CATEGORY_NAME}改'，deleted 均为 1
-     （步骤 5 建→7 改名→10 删一行，步骤 12 同名重建→13 再删一行）
+     预期：2 的整数倍行 —— 首轮 2 行，本脚本每重跑一次 +2 行
+     （重跑不会失败，脚本可安全重复执行；历史行不会被脚本清理，故会逐轮累积）
+     且每一行的 categoryName 均为 '${CATEGORY_NAME}改'，deleted 均为 1
+     （每轮：步骤 5 建→7 改名→10 删一行，步骤 12 同名重建→13 再删一行）
 
   2) SELECT articleId, categoryId FROM article WHERE categoryId = $CATEGORY_ID;
      预期：无结果。若你此前给该分类挂过文章，则那些文章的 categoryId 应为 NULL
