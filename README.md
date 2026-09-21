@@ -25,7 +25,8 @@ myblog/
 │   └── rustfs/
 ├── docs/superpowers/
 │   ├── specs/        # 设计规格（冻结的需求来源）
-│   └── plans/        # 实现计划
+│   ├── plans/        # 实现计划
+│   └── followups/    # 已交付切片的延后项与撤回项（下个切片先读）
 └── .tmp/             # 参考素材（poetize.cn 还原用，不入库）
 ```
 
@@ -78,6 +79,19 @@ mysql -u<user> -p < backend/src/main/resources/db/schema.sql
 > 已就绪但**待手工执行**，且因本切片没有文章写入口，其第二层需要先手工灌入样例数据（脚本末尾附 INSERT）。
 > **建库建表（DDL）与脚本末尾的落库核对由使用者手工执行。**
 >
+> **文章列表切片的延后项：** 最终审查判「可合并」后遗留的改进项、以及**已判定不必再提的撤回项**，
+> 统一记在 `docs/superpowers/followups/2026-09-21-article-list-slice-followups.md`。下个切片开工前先读那份，
+> 免得重新发现、重新争论同一批事。
+>
 > **下一步：** `/tag/:id`、`/article/:articleId`、`/archive`、`/search`、`/friends`、`/about` 仍为占位页；其余业务表的 CRUD、浏览量统计、管理端页面、RustFS 上传、Docker Compose 编排。
 >
-> **已知未修（用户 2026-09-20 裁定暂不动）：** 暗色主题刷新后不生效 —— `frontend/src/store/theme.ts` 的 `init()` 没有调用点，localStorage 里的暗色偏好在刷新后不会打到 `:root` 上（表现为图标显示「暗色」而页面是亮的），点一次切换按钮才生效。
+> **已知未修 —— 两条都并入同一个「暗色主题」切片（用户 2026-09-21 裁定）：**
+>
+> 1. **暗色偏好刷新后失效**（2026-09-20 裁定暂不动）：`frontend/src/store/theme.ts` 的 `init()` 没有调用点，
+>    localStorage 里的暗色偏好在刷新后不会打到 `:root` 上（表现为图标显示「暗色」而页面是亮的），
+>    点一次切换按钮才生效。
+> 2. **Element Plus 控件在暗色下仍是亮色**：`frontend/src/main.ts` 只 import 了 `element-plus/dist/index.css`，
+>    没有 import `element-plus/theme-chalk/dark/css-vars.css`，因此 `el-pagination` 等 EP 组件不随主题走
+>    （2026-09-21 由文章列表切片暴露 —— 它是前台第一个把大块 EP 组件放上暗色页的地方）。
+>    **原因只有「少 import 一个文件」这一条**，别记成选择器不匹配：`:root.dark` 与 EP 的 `html.dark` 是同一个选择器。
+>    修法是 1 行，但会改动全站所有 EP 组件在暗色下的观感，所以与第 1 条合起来单独做、一次验证。
