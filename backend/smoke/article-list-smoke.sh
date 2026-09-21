@@ -7,6 +7,19 @@
 #   2. 已填写 backend/config/application-local.yml
 #   3. Redis 已启动
 #   4. 后端已启动（启动命令见 category-smoke.sh 头部，与之相同）
+#   5. 【第二层的前提，务必先读】库中 article 表除本脚本的样例数据（9901-9905）外，
+#      **不存在其它文章**。理由是下面这四条查询不按 categoryId 限域，取值落在全库范围，
+#      故只有在「全库只有样例数据」时断言值才成立：
+#        · keyword=user_name → total=1（含「下划线被转义」那条，它同样断言 total=1）
+#        · keyword=100%25    → total=1
+#        · recommended=true  → total=1
+#        · top=true          → total=1
+#      一旦你通过管理端（本项目下一步）写了真实文章，只要其中有一篇的标题或摘要含
+#      user_name / 100%，或它 isRecommended=1 / isTop=1，对应断言就会变红 ——
+#      **那是你的库里有别的文章，不是接口坏了**（失败信息里会打出原始响应，可据此确认）。
+#      届时给这四条查询各加上 &categoryId=$SMOKE_CID 限域即可；本脚本刻意不加，因为
+#      这些数值与筛选条件是切片设计规格钉死的，改断言须同步改规格。
+#      第二层其余断言都按 id 限域（categoryId=9900 / tagId=9911 / 9901 / 9902），不受本前提影响。
 #
 # 运行本脚本：
 #   bash backend/smoke/article-list-smoke.sh
@@ -236,7 +249,9 @@ fi
 echo
 echo "=========== 汇总 ==========="
 echo "通过 $pass_count 项，失败 $fail_count 项"
-[ "$fail_count" -eq 0 ] || exit 1
+# 退出码刻意不在这里给：脚本头部（及上面「第二层」段）的指引是「见文末 INSERT」，
+# 若此处提前 exit 1，失败时那段样例数据 SQL 就再也不打印了 —— 而指针恰好在最需要它
+# 的时候断掉。故把退出码挪到文末 SQL 之后，见文件最后两行。
 
 cat <<'SQL'
 
@@ -299,4 +314,9 @@ DELETE FROM category   WHERE categoryId = 9900;
 
 SQL
 
+# 退出码在最后单独给出，且必须是文件的最后两条命令：
+#   · 有失败 → exit 1；全过 → exit 0（语义与原先一致）
+#   · 上面 cat 的返回码不能覆盖退出码 —— 这正是末尾这行显式 exit 0 存在的理由，
+#     请勿把它删掉或挪到 cat 之前
+[ "$fail_count" -eq 0 ] || exit 1
 exit 0
