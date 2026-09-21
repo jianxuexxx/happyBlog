@@ -19,14 +19,13 @@
 myblog/
 ├── backend/          # Spring Boot 后端服务
 ├── frontend/         # Vue3 前端（前台 + /admin 管理端）
-├── docker/           # docker-compose 编排及中间件配置
-│   ├── mysql/
-│   ├── redis/
-│   └── rustfs/
-├── docs/superpowers/
-│   ├── specs/        # 设计规格（冻结的需求来源）
-│   ├── plans/        # 实现计划
-│   └── followups/    # 已交付切片的延后项与撤回项（下个切片先读）
+├── docker/           # docker-compose 编排及中间件配置（**尚未创建**，见 ROADMAP §3-A）
+├── docs/
+│   ├── ROADMAP.md    # 后续工作路线图（活文档，随交付更新）
+│   └── superpowers/
+│       ├── specs/    # 设计规格（冻结的需求来源）
+│       ├── plans/    # 实现计划
+│       └── followups/ # 已交付切片的延后项与撤回项（下个切片先读）
 └── .tmp/             # 参考素材（poetize.cn 还原用，不入库）
 ```
 
@@ -78,12 +77,16 @@ mysql -u<user> -p < backend/src/main/resources/db/schema.sql
 > **`GET /api/article/list` 的端到端验证尚未完成**：冒烟脚本 `backend/smoke/article-list-smoke.sh`
 > 已就绪但**待手工执行**，且因本切片没有文章写入口，其第二层需要先手工灌入样例数据（脚本末尾附 INSERT）。
 > **建库建表（DDL）与脚本末尾的落库核对由使用者手工执行。**
+> 另有两条要记住的事实：**应用本身从未被启动过**（既没 `spring-boot:run` 过，`docker/` 也还是空的），仓库里**没有 CI**。
+> 所有「绿」都来自单测／切片测试／静态检查。详见 [`docs/ROADMAP.md`](docs/ROADMAP.md) §5。
 >
 > **文章列表切片的延后项：** 最终审查判「可合并」后遗留的改进项、以及**已判定不必再提的撤回项**，
 > 统一记在 `docs/superpowers/followups/2026-09-21-article-list-slice-followups.md`。下个切片开工前先读那份，
 > 免得重新发现、重新争论同一批事。
 >
-> **下一步：** `/tag/:id`、`/article/:articleId`、`/archive`、`/search`、`/friends`、`/about` 仍为占位页；其余业务表的 CRUD、浏览量统计、管理端页面、RustFS 上传、Docker Compose 编排。
+> **下一步：** 完整清单、每项规模与建议顺序见 **[`docs/ROADMAP.md`](docs/ROADMAP.md)**
+> （9 个剩余切片 + 横切欠账 + 验证债）。一句话：`/tag/:id`、`/article/:articleId`、`/archive`、`/search`、
+> `/friends`、`/about` 仍为占位页，且 —— **系统里还没有任何创建文章的路径**，这是所有前台页面接线的卡点。
 >
 > **已知未修 —— 两条都并入同一个「暗色主题」切片（用户 2026-09-21 裁定）：**
 >
