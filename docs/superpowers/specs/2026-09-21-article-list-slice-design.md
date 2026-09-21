@@ -142,6 +142,8 @@ ORDER BY isTop DESC, createdAt DESC, articleId DESC
 - `categoryId=abc`（类型不匹配）→ 由既有 `GlobalExceptionHandler` 映射为 `40001`，**不新增错误码**
 - **本次不新增任何 `ResultCode`**
 
+> **规划期发现的待验证点（任务 3 会先撞上）**：`@ModelAttribute` 绑定失败时，Spring MVC 抛的是 `MethodArgumentNotValidException` 还是 `BindException`，**随版本而异**；`GlobalExceptionHandler` 目前只注册了前者。若实测落到 `BindException`，它会被 catch-all 兜成 `50000`——那正是主规格 §10 点名要避免的「客户端错误被误报成服务器故障」。届时须补一个 `BindException` 的 handler。任务 3 的测试先按 `40001` 写，跑出来的真实结果决定是否补。
+
 ## 4. 查询实现
 
 ### 分页
