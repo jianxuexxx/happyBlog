@@ -292,7 +292,11 @@ PUT  /api/admin/site/config          保存站点配置
 
 ## 15. 待实现序列建议
 
-1. Docker 基础设施与初始化（MySQL/Redis/RustFS）
+> **注记（2026-09-21）：** 本节是**冻结**的原始序列建议，保留已完成项的状态记载。
+> 剩余工作的**活文档**在 [`docs/ROADMAP.md`](../../ROADMAP.md) —— 那边有完整切片清单、横切欠账、
+> 验证债与建议顺序，**排序以那里为准**；本节不再逐条维护。
+
+1. Docker 基础设施与初始化（MySQL/Redis/RustFS）—— 排序已下调（理由见 ROADMAP §6：应用本就能在本地跑，Docker 不解除验证阻塞，现在只是部署形态与 RustFS 的前置）
 2. 后端骨架（Spring Boot + MyBatis-Plus + 公共字段/逻辑删除/统一返回/全局异常）✅（2026-09-20 完成，含极简 JWT 鉴权与 OpenAPI 配置就绪；导出需运行应用）
 3. 数据模型与基础 CRUD（分类/标签/文章）—— 全部 7 张表的 DDL/实体/Mapper 已就位；`category` 一条 CRUD 的代码路径已完成并测试覆盖，端到端已按 `backend/smoke/category-smoke.sh` 真实跑通（22/22，含真库写入、缓存失效与自排除谓词断言），其余表待实现
 4. 前台核心接口 + 缓存/浏览量 —— 进行中：`GET /api/category/list`（含 `blog:category:list` 缓存，TTL 5 分钟，写操作失效）与 `GET /api/article/list`（含 categoryId/tagId/keyword/recommended/top 全部筛选与分页，**不带缓存**，见下方 §9 注记）已就位；文章详情与浏览量统计待实现
