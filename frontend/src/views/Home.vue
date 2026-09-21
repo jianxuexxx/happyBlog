@@ -5,9 +5,17 @@ import CarouselHero from '../components/home/CarouselHero.vue'
 import SidebarCategories from '../components/home/SidebarCategories.vue'
 import SidebarRecommended from '../components/home/SidebarRecommended.vue'
 import NoticeFloat from '../components/home/NoticeFloat.vue'
+import ArticleCard from '../components/ArticleCard.vue'
 
-// 骨架数据占位：真实数据来自 GET /api/article/list（后端接入后替换）
-const articleSkeletons = [1, 2, 3, 4, 5, 6]
+// 骨架数据占位：真实数据来自 GET /api/article/list（后端已就绪，首页接线留待后续）
+const articleSkeletons = [
+  { articleId: 1, title: '文章标题占位 1', summary: '摘要占位：接入后端后展示真实摘要。', coverImage: '', createdAt: '2026-09-17T00:00:00', viewCount: 0 },
+  { articleId: 2, title: '文章标题占位 2', summary: '摘要占位：接入后端后展示真实摘要。', coverImage: '', createdAt: '2026-09-17T00:00:00', viewCount: 0 },
+  { articleId: 3, title: '文章标题占位 3', summary: '摘要占位：接入后端后展示真实摘要。', coverImage: '', createdAt: '2026-09-17T00:00:00', viewCount: 0 },
+  { articleId: 4, title: '文章标题占位 4', summary: '摘要占位：接入后端后展示真实摘要。', coverImage: '', createdAt: '2026-09-17T00:00:00', viewCount: 0 },
+  { articleId: 5, title: '文章标题占位 5', summary: '摘要占位：接入后端后展示真实摘要。', coverImage: '', createdAt: '2026-09-17T00:00:00', viewCount: 0 },
+  { articleId: 6, title: '文章标题占位 6', summary: '摘要占位：接入后端后展示真实摘要。', coverImage: '', createdAt: '2026-09-17T00:00:00', viewCount: 0 },
+]
 
 /**
  * 首页布局 v2（A 方案）
@@ -56,17 +64,7 @@ function toggleExpand() {
         <section class="home-main">
           <h2 class="section-title">最新</h2>
           <div class="article-list">
-            <article v-for="n in articleSkeletons" :key="n" class="article-card card">
-              <div class="article-cover img-placeholder">封面占位</div>
-              <div class="article-body">
-                <h3>文章标题占位 {{ n }}</h3>
-                <p class="article-summary">摘要占位：接入后端后展示真实摘要。</p>
-                <div class="article-meta">
-                  <span class="tag-chip">标签</span>
-                  <span class="num">浏览 0 · 2026-09-17</span>
-                </div>
-              </div>
-            </article>
+            <ArticleCard v-for="item in articleSkeletons" :key="item.articleId" v-bind="item" />
           </div>
         </section>
       </div>
@@ -162,44 +160,6 @@ function toggleExpand() {
 .article-list {
   display: grid;
   gap: 16px;
-}
-.article-card {
-  display: flex;
-  gap: 16px;
-  padding: 16px;
-}
-.article-cover {
-  width: 200px;
-  min-height: 120px;
-  flex-shrink: 0;
-}
-.article-body {
-  flex: 1;
-  min-width: 0;
-}
-.article-body h3 {
-  margin: 4px 0 8px;
-  font-size: 18px;
-}
-.article-summary {
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.7;
-  margin: 0 0 12px;
-}
-.article-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-.tag-chip {
-  background: var(--brand-accent-soft);
-  color: var(--brand-primary);
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
 }
 
 /* 响应式：窄屏收起左侧栏 */
