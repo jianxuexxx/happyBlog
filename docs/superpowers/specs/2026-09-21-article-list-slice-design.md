@@ -133,7 +133,9 @@ ORDER BY isTop DESC, createdAt DESC, articleId DESC
 
 `PageResult` 为既有类型（`com.blog.common.PageResult`），字段顺序 `total` / `page` / `pageSize` / `list`。
 
-**响应里的 `page` / `pageSize` 是钳制生效后的值**：请求 `pageSize=999` 时，响应中 `pageSize` 为 `50`，而不是把请求值原样回显。回显原值会让前端的页码控件按 999 去排页，与实际返回的条数对不上。
+**响应里的 `pageSize` 是钳制生效后的值**：请求 `pageSize=999` 时，响应中 `pageSize` 为 `50`，而不是把请求值原样回显。回显原值会让前端的页码控件按 999 去排页，与实际返回的条数对不上。
+
+`page` 不适用上面这条：它**只钳下界**（`page < 1`，含 `0`，会被改成 `1`），**上界不钳** —— `page=9` 会原样回显。别把响应里的 `page` 读成「一定落在有效范围内的页号」。
 
 ### 错误与边界
 

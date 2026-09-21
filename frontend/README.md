@@ -49,8 +49,12 @@ src/
 | `fetchArticleList(query)` | `GET /api/article/list` | 分类页文章列表 |
 
 `fetchArticleList` 的返回是 `PageResult<T>`：`{ total, page, pageSize, list }`，字段与后端
-`com.blog.common.PageResult` 一一对应。**响应里的 `page` / `pageSize` 是后端钳制生效后的值**
+`com.blog.common.PageResult` 一一对应。**响应里的 `pageSize` 是后端钳制生效后的值**
 （请求 `pageSize=999` 会得到 `50`），不是请求值的回显。
+
+`page` 则**只钳下界**：`page < 1`（含 `0`）会被改成 `1`，**上界不钳** —— `page=9` 会原样回显。
+所以别把「响应里的 page 一定是有效页」当作前提（后端 `ArticleServiceImpl.normalizePage` 与
+`frontend/src/api/article.ts` 的注释是同一口径）。
 
 `createdAt` 是 ISO-8601（`2026-09-21T14:30:00`）。后端刻意不定制时间格式（理由见
 `docs/superpowers/specs/2026-09-21-article-list-slice-design.md` §2），因为它同时是
