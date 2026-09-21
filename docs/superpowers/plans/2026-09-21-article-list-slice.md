@@ -169,21 +169,29 @@ class ArticleServiceImplTest {
         return a;
     }
 
-    /** 打桩 selectPage，并返回捕获到的 wrapper。 */
-    @SuppressWarnings("unchecked")
-    private AbstractWrapper<Article, ?, ?> captureWrapper(List<Article> records, long total) {
+    /** 打桩 selectPage：固定返回给定记录与总数。所有用例统一走这里，不要各自复制 willAnswer 块。 */
+    private void stubPage(List<Article> records, long total) {
         given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
             Page<Article> p = invocation.getArgument(0);
             p.setRecords(records);
             p.setTotal(total);
             return p;
         });
+    }
 
-        service.list(emptyQuery());
-
+    /** 取出上一次 selectPage 实际收到的 wrapper。 */
+    @SuppressWarnings("unchecked")
+    private AbstractWrapper<Article, ?, ?> lastWrapper() {
         ArgumentCaptor<Wrapper<Article>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(articleMapper).selectPage(any(), captor.capture());
         return (AbstractWrapper<Article, ?, ?>) captor.getValue();
+    }
+
+    /** 打桩后跑一次无参查询，返回捕获到的 wrapper。 */
+    private AbstractWrapper<Article, ?, ?> captureWrapper(List<Article> records, long total) {
+        stubPage(records, total);
+        service.list(emptyQuery());
+        return lastWrapper();
     }
 
     // ---------- 恒定条件与排序 ----------
@@ -227,12 +235,7 @@ class ArticleServiceImplTest {
     @DisplayName("分页钳制：page 为 null / 0 / 负数一律当 1")
     void normalizesPage() {
         for (Integer raw : new Integer[] {null, 0, -3}) {
-            given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-                Page<Article> p = invocation.getArgument(0);
-                p.setRecords(List.of());
-                p.setTotal(0);
-                return p;
-            });
+            stubPage(List.of(), 0);
 
             PageResult<ArticleListVO> result = service.list(query(raw, 10));
 
@@ -254,12 +257,7 @@ class ArticleServiceImplTest {
             Integer raw = (Integer) c[0];
             long expected = (Integer) c[1];
 
-            given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-                Page<Article> p = invocation.getArgument(0);
-                p.setRecords(List.of());
-                p.setTotal(0);
-                return p;
-            });
+            stubPage(List.of(), 0);
 
             PageResult<ArticleListVO> result = service.list(query(1, raw));
 
@@ -270,12 +268,7 @@ class ArticleServiceImplTest {
     @Test
     @DisplayName("分页钳制：传给 selectPage 的是钳制后的值（不是请求值）")
     void passesClampedValuesToMapper() {
-        given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-            Page<Article> p = invocation.getArgument(0);
-            p.setRecords(List.of());
-            p.setTotal(0);
-            return p;
-        });
+        stubPage(List.of(), 0);
 
         service.list(query(0, 999));
 
@@ -289,12 +282,7 @@ class ArticleServiceImplTest {
     @DisplayName("分页钳制：回显的是钳制后的值，不是请求值")
     void echoesClampedValues() {
         // 规格 §3：回显原值会让前端页码控件按请求值排页，与实际返回条数对不上
-        given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-            Page<Article> p = invocation.getArgument(0);
-            p.setRecords(List.of());
-            p.setTotal(0);
-            return p;
-        });
+        stubPage(List.of(), 0);
 
         PageResult<ArticleListVO> result = service.list(query(0, 999));
 
@@ -310,12 +298,7 @@ class ArticleServiceImplTest {
     @DisplayName("VO 转换：viewCount 为 null 时按 0 处理")
     void mapsNullViewCountToZero() {
         Article a = article(7L, "空浏览量", null);
-        given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-            Page<Article> p = invocation.getArgument(0);
-            p.setRecords(List.of(a));
-            p.setTotal(1);
-            return p;
-        });
+        stubPage(List.of(a), 1);
 
         PageResult<ArticleListVO> result = service.list(query(1, 10));
 
@@ -572,7 +555,7 @@ git commit -m "feat(backend): article 列表 Service 骨架——恒定 status=1
 
 - [ ] **步骤 1：编写失败的测试**
 
-在 `ArticleServiceImplTest.java` 的 `// ---------- VO 转换 ----------` 之前插入以下内容：
+在 `ArticleServiceImplTest.java` 的 `// ---------- VO 转换 ----------` 之前插入以下内容（**复用**任务 1 留在该文件里的 `stubPage(...)` 与 `lastWrapper()`，不要新增第二份桩助手）：
 
 ```java
     // ---------- 五个筛选参数 ----------
@@ -583,20 +566,15 @@ git commit -m "feat(backend): article 列表 Service 骨架——恒定 status=1
         return q;
     }
 
+    /**
+     * 用给定的查询对象跑一次，返回捕获到的 wrapper。
+     * stubPage / lastWrapper 是任务 1 已在本文件里写好的助手，**直接复用**——不要再复制
+     * 一份 willAnswer 桩或 ArgumentCaptor 样板进来（同一份样板已经被复制过 5 次）。
+     */
     private AbstractWrapper<Article, ?, ?> captureWrapperFor(ArticleQueryDTO q) {
-        given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-            Page<Article> p = invocation.getArgument(0);
-            p.setRecords(List.of());
-            p.setTotal(0);
-            return p;
-        });
-
+        stubPage(List.of(), 0);
         service.list(q);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Wrapper<Article>> captor = ArgumentCaptor.forClass(Wrapper.class);
-        verify(articleMapper).selectPage(any(), captor.capture());
-        return (AbstractWrapper<Article, ?, ?>) captor.getValue();
+        return lastWrapper();
     }
 
     @Test
@@ -649,10 +627,24 @@ git commit -m "feat(backend): article 列表 Service 骨架——恒定 status=1
         AbstractWrapper<Article, ?, ?> wrapper =
                 captureWrapperFor(filterQuery(q -> q.setKeyword("spring")));
 
+        // ⚠️ 不要退回成 assertThat(sql).contains("(") —— 那是恒真的：MyBatis-Plus 的
+        // NormalSegmentList 无条件给条件列表加**外层**括号，所以漏掉 and(...) 嵌套、
+        // 直接 like(title).or().like(summary) 时 SQL 是
+        //   (status = ? AND title LIKE ? OR summary LIKE ?)
+        // 它也含括号、也含 OR、也含 title/summary，那条断言照样全绿，而草稿与私密文章
+        // 已经泄漏进前台列表。真正的判据是「包住 OR 的那个括号分组里不含 status」：
+        //   正确：(status = ? AND (title LIKE ? OR summary LIKE ?))
+        //   泄漏：(status = ? AND title LIKE ? OR summary LIKE ?)
         String sql = wrapper.getTargetSql();
         assertThat(sql).contains("title").contains("summary").contains("OR");
-        // 没有括号时，仅靠 OR 会把 status=1 这个恒定条件一并绕过，草稿与私密文章会泄漏进列表
-        assertThat(sql).as("keyword 的 OR 必须被括号包住，实际 SQL: %s", sql).contains("(");
+
+        int or = sql.indexOf("OR");
+        assertThat(or).as("实际 SQL: %s", sql).isGreaterThan(-1);
+        String orGroup = sql.substring(sql.lastIndexOf('(', or), sql.indexOf(')', or));
+        assertThat(orGroup)
+                .as("OR 必须被独立括号分组，否则 status=1 会被 OR 绕过、草稿与私密文章泄漏进列表。"
+                        + "实际 SQL: %s，OR 所在分组: %s", sql, orGroup)
+                .doesNotContain("status");
         assertThat(wrapper.getParamNameValuePairs().values())
                 .as("参数: %s", wrapper.getParamNameValuePairs())
                 .contains("%spring%");
@@ -817,7 +809,11 @@ cd backend && JAVA_HOME=/e/works/jdk21 PATH=/e/works/jdk21/bin:$PATH /e/works/ap
 
 预期：**PASS**，任务 1 与任务 2 的全部用例绿。
 
-若 `keywordIsNestedInParentheses` 红在 `contains("(")`：说明 `and(...)` 没被正确调用，或 `getTargetSql()` 的括号呈现形式与预期不同。**先打印实际 SQL 再判断**——`like` 生成的 `?` 占位符形态可能影响字符串匹配，但括号本身必须存在，这是不能让步的（去掉括号会导致草稿泄漏）。
+若 `keywordIsNestedInParentheses` 红在最后的 `doesNotContain("status")`：说明 `and(...)` 没被正确调用（写成了顶层的 `.or()`），OR 逃出了自己的分组、把 `status = 1` 一起绕过——这正是草稿与私密文章泄漏进前台列表的形态。**必须改实现代码，不要改断言、也不要放宽断言**。
+
+若红在 `isGreaterThan(-1)`（SQL 里没有 `OR`）：说明 `like` 根本没生效。
+
+**先打印实际 SQL 再判断**：`like` 生成的 `?` 占位符形态不影响本断言（它只看括号分组形状，不看占位符）。
 
 - [ ] **步骤 5：Commit**
 
@@ -1809,7 +1805,7 @@ function onPageChange(next: number) {
 cd frontend && npm run test -- category-page
 ```
 
-预期：**PASS**，9 个用例全绿。
+预期：**PASS**，`10 passed`——本文件应是 10 个用例，逐一核对名字：渲染后端返回的文章卡片 / 把路由里的 categoryId 作为筛选条件传给后端 / 空结果显示空态而不是错误态 / 取数失败显示错误态与后端 message，重试可恢复 / 路由参数从 `/category/1` 变到 `/category/2` 时重新取数 / 切分类时页码归 1 / 翻页把页码写进 URL / 非法 page 退化为第 1 页 / 用分类名做页头标题 / 分类名取不到时退化为「分类」二字。少一个就说明上面的测试代码没抄全。
 
 若 `翻页把页码写进 URL` 红在找不到 `.el-pager li`：Element Plus 的 `el-pagination` 在 `total` 较小时仍会渲染页码列表，`30/10 = 3` 页足够。**先打印 `wrapper.html()` 看实际 DOM** 再调整选择器，不要改成直接调 `onPageChange`——那样就绕开了「用户点分页器」这个真实路径。
 
@@ -1870,7 +1866,7 @@ git commit -m "feat(frontend): 分类页接上 GET /api/article/list，页码住
 #   任何一次成功的 GET /api/article/list，都在端到端地证明：
 #     1) 真实应用能启动（不是单测上下文，不是 @WebMvcTest 切片）
 #     2) 依赖注入完整（ArticleServiceImpl 真的拿到了 ArticleMapper）
-#     3) 7 个 Mapper 接口都已注册（@MapperScan("com.blog.config.MybatisPlusConfig") 生效）
+#     3) 7 个 Mapper 接口都已注册（com.blog.config.MybatisPlusConfig 上的 @MapperScan("com.blog.mapper") 生效）
 #   与 category-smoke.sh 的【证据一】同一个道理：若 @MapperScan 被挪回启动类，
 #   所有单测与切片依然全绿，而真实应用启动时直接抛 NoSuchBeanDefinitionException。
 #
@@ -1984,7 +1980,10 @@ else
   # 结果里出现 viewCount=0 就说明草稿或私密泄漏进了前台列表。
   expect_json "结果里没有 viewCount=0 的文章（即草稿/私密未泄漏）" \
     "$BODY" '[.data.list[] | select(.viewCount == 0)] | length' 0
-  expect_json "默认排序里置顶文章排第一"                 "$BODY" '.data.list[0].isTop' 1
+  # 置顶优先的判据：9901 是样例里唯一 isTop=1 的文章，而它的 createdAt **最旧**（5 天前）。
+  # ArticleListVO 没有 isTop 字段（规格 §3），所以只能靠「最旧的那篇反而排最前」来证明
+  # 置顶优先 —— 排序里一旦漏掉 isTop DESC，9901 会掉到最后一位。
+  expect_json "置顶优先：createdAt 最旧的 9901 排第一" "$BODY" '.data.list[0].articleId' 9901
   expect_json "置顶文章的浏览量为 10（样例数据特征值）" "$BODY" '.data.list[0].viewCount' 10
 
   BODY=$(get "/api/article/list?tagId=$SMOKE_TAG")
@@ -2130,13 +2129,28 @@ bash -n backend/smoke/article-list-smoke.sh && echo "语法 OK"
 
 - [ ] **步骤 4：更新 `README.md` 的「## 状态」**
 
-修改 `README.md` 的 `## 状态` 一节，把「前端已接上首条真实数据链路」那段之后替换/追加为：
+修改 `README.md` 的 `## 状态` 一节，做**三处**替换（(a)、(b)、(c)）：
+
+**(a)** 把「前端已接上首条真实数据链路」那段替换为：
 
 ```markdown
-> **前端已接上两条真实数据链路：** 首页侧栏「分类」卡片读 `GET /api/category/list`（2026-09-20），
-> `/category/:id` 分类页读 `GET /api/article/list`（2026-09-21，含分页与 URL 页码）。
-> 浏览器实测能渲染真库数据（空库显示「暂无文章」）。
->
+> **前端已接上两条真实数据链路：** 首页侧栏「分类」卡片读 `GET /api/category/list`（2026-09-20，
+> 浏览器实测能渲染真库数据，空库显示「暂无分类」）；`/category/:id` 分类页读
+> `GET /api/article/list`（2026-09-21，含分页与 URL 页码，空态显示「暂无文章」）。
+> **该页面尚未在浏览器中实测** —— 接口与接线已完成，真实渲染效果待人工验证后再写进本节。
+```
+
+**(b)** 把紧随「验证边界」之后的「**下一步：**」那段**整段替换**为：
+
+```markdown
+> **下一步：** `/tag/:id`、`/article/:articleId`、`/archive`、`/search`、`/friends`、`/about` 仍为占位页；其余业务表的 CRUD、浏览量统计、管理端页面、RustFS 上传、Docker Compose 编排。
+```
+
+**必须改 (b)**：原「下一步」里写着「`GET /api/article/list?categoryId=`（`/category/:id` 目前仍是占位页）」，本切片落地后这句为假。只改 (a) 不改 (b)，同一节会前半段说分类页已接真数据、后半段说它仍是占位页。
+
+**(c)** 把「验证边界」那段替换为：
+
+```markdown
 > **验证边界：** 编译、Mockito 单测、MockMvc 切片、前端 vitest 与 `vue-tsc` 类型检查由开发侧负责；
 > category 竖切链路另经 `backend/smoke/category-smoke.sh` 真实 HTTP 跑通。
 > **`GET /api/article/list` 的端到端验证尚未完成**：冒烟脚本 `backend/smoke/article-list-smoke.sh`
