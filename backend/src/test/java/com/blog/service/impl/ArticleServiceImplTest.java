@@ -2,6 +2,7 @@ package com.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
@@ -96,7 +97,11 @@ class ArticleServiceImplTest {
     @SuppressWarnings("unchecked")
     private AbstractWrapper<Article, ?, ?> lastWrapper() {
         ArgumentCaptor<Wrapper<Article>> captor = ArgumentCaptor.forClass(Wrapper.class);
-        verify(articleMapper).selectPage(any(), captor.capture());
+        // 用 atLeastOnce 而非默认的 times(1)：同一测试方法可能跑多次 list()（如
+        // recommendsAndTopsOnlyWhenTrue 三次、skipsBlankKeyword 两次），默认 verify 会在
+        // 第二次捕获时因「调用了 2 次却要求恰好 1 次」抛 TooManyActualInvocations。
+        // captor.getValue() 返回的是最后一次捕获到的值，正好就是「上一次」的 wrapper。
+        verify(articleMapper, atLeastOnce()).selectPage(any(), captor.capture());
         return (AbstractWrapper<Article, ?, ?>) captor.getValue();
     }
 
@@ -224,6 +229,181 @@ class ArticleServiceImplTest {
         assertThat(vo.getCoverImage()).isEqualTo("/images/cover-7.jpg");
         assertThat(vo.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 9, 21, 14, 30));
         assertThat(vo.getViewCount()).isEqualTo(128);
+    }
+
+    // ---------- 五个筛选参数 ----------
+
+    private ArticleQueryDTO filterQuery(java.util.function.Consumer<ArticleQueryDTO> customizer) {
+        ArticleQueryDTO q = new ArticleQueryDTO();
+        customizer.accept(q);
+        return q;
+    }
+
+    /**
+     * 用给定的查询对象跑一次，返回捕获到的 wrapper。
+     * stubPage / lastWrapper 是任务 1 已在本文件里写好的助手，**直接复用**——不要再复制
+     * 一份 willAnswer 桩或 ArgumentCaptor 样板进来（同一份样板已经被复制过 5 次）。
+     */
+    private AbstractWrapper<Article, ?, ?> captureWrapperFor(ArticleQueryDTO q) {
+        stubPage(List.of(), 0);
+        service.list(q);
+        AbstractWrapper<Article, ?, ?> wrapper = lastWrapper();
+        // MyBatis-Plus 只在生成 SQL 段（getTargetSql）时才填充 paramNameValuePairs；
+        // 提前触发一次，否则 trimsKeyword / escapesLikeWildcardsInKeyword 直接调
+        // getParamNameValuePairs() 拿到的是空 Map（filtersByCategoryId 能过是因为它先
+        // 断言了 getTargetSql()）。
+        wrapper.getTargetSql();
+        return wrapper;
+    }
+
+    @Test
+    @DisplayName("筛选：categoryId 传入时加入条件，参数值正确")
+    void filtersByCategoryId() {
+        AbstractWrapper<Article, ?, ?> wrapper =
+                captureWrapperFor(filterQuery(q -> q.setCategoryId(3L)));
+
+        assertThat(wrapper.getTargetSql()).contains("categoryId");
+        assertThat(wrapper.getParamNameValuePairs().values()).contains(3L);
+    }
+
+    @Test
+    @DisplayName("筛选：categoryId 为 null 时不加该条件")
+    void skipsCategoryIdWhenNull() {
+        AbstractWrapper<Article, ?, ?> wrapper = captureWrapperFor(emptyQuery());
+
+        assertThat(wrapper.getTargetSql()).doesNotContain("categoryId");
+    }
+
+    @Test
+    @DisplayName("筛选：recommended/top 只在 true 时加条件——false 与 null 都是不筛选")
+    void recommendsAndTopsOnlyWhenTrue() {
+        // 这两个布尔是「加上这个约束」的开关，false 不是「筛选出非推荐的」。
+        // 写成 eq(recommended != null, ...) 会把 false 当成一个真实条件（规格 §3）。
+        // 断言必须看 WHERE 段（getNormal().getSqlSegment()）而不是 getTargetSql()：后者带着
+        // 任务 1 的恒定排序 ORDER BY isTop DESC，天然含 isTop，会让 doesNotContain("isTop")
+        // 永远失败，也让 onlyTrue 的 contains("isTop") 恒真（压根没验证 top 筛选是否被加上）。
+        AbstractWrapper<Article, ?, ?> onlyTrue = captureWrapperFor(filterQuery(q -> {
+            q.setRecommended(true);
+            q.setTop(true);
+        }));
+        assertThat(onlyTrue.getExpression().getNormal().getSqlSegment())
+                .contains("isRecommended").contains("isTop");
+
+        AbstractWrapper<Article, ?, ?> whenFalse = captureWrapperFor(filterQuery(q -> {
+            q.setRecommended(false);
+            q.setTop(false);
+        }));
+        assertThat(whenFalse.getExpression().getNormal().getSqlSegment())
+                .as("false 必须等同于不筛选，实际 SQL: %s", whenFalse.getTargetSql())
+                .doesNotContain("isRecommended")
+                .doesNotContain("isTop");
+
+        AbstractWrapper<Article, ?, ?> whenNull = captureWrapperFor(emptyQuery());
+        assertThat(whenNull.getExpression().getNormal().getSqlSegment())
+                .doesNotContain("isRecommended")
+                .doesNotContain("isTop");
+    }
+
+    @Test
+    @DisplayName("筛选：keyword 用括号包住 title OR summary，避免 OR 逃逸污染其他条件")
+    void keywordIsNestedInParentheses() {
+        AbstractWrapper<Article, ?, ?> wrapper =
+                captureWrapperFor(filterQuery(q -> q.setKeyword("spring")));
+
+        // ⚠️ 不要退回成 assertThat(sql).contains("(") —— 那是恒真的：MyBatis-Plus 的
+        // NormalSegmentList 无条件给条件列表加**外层**括号，所以漏掉 and(...) 嵌套、
+        // 直接 like(title).or().like(summary) 时 SQL 是
+        //   (status = ? AND title LIKE ? OR summary LIKE ?)
+        // 它也含括号、也含 OR、也含 title/summary，那条断言照样全绿，而草稿与私密文章
+        // 已经泄漏进前台列表。真正的判据是「包住 OR 的那个括号分组里不含 status」：
+        //   正确：(status = ? AND (title LIKE ? OR summary LIKE ?))
+        //   泄漏：(status = ? AND title LIKE ? OR summary LIKE ?)
+        String sql = wrapper.getTargetSql();
+        assertThat(sql).contains("title").contains("summary").contains("OR");
+
+        int or = sql.indexOf("OR");
+        assertThat(or).as("实际 SQL: %s", sql).isGreaterThan(-1);
+        String orGroup = sql.substring(sql.lastIndexOf('(', or), sql.indexOf(')', or));
+        assertThat(orGroup)
+                .as("OR 必须被独立括号分组，否则 status=1 会被 OR 绕过、草稿与私密文章泄漏进列表。"
+                        + "实际 SQL: %s，OR 所在分组: %s", sql, orGroup)
+                .doesNotContain("status");
+        assertThat(wrapper.getParamNameValuePairs().values())
+                .as("参数: %s", wrapper.getParamNameValuePairs())
+                .contains("%spring%");
+    }
+
+    @Test
+    @DisplayName("筛选：keyword 的空白串与纯空格都视为不传")
+    void skipsBlankKeyword() {
+        assertThat(captureWrapperFor(filterQuery(q -> q.setKeyword(""))).getTargetSql())
+                .doesNotContain("title");
+        assertThat(captureWrapperFor(filterQuery(q -> q.setKeyword("   "))).getTargetSql())
+                .doesNotContain("title");
+    }
+
+    @Test
+    @DisplayName("筛选：keyword 前后空白被 trim 掉，不参与 LIKE")
+    void trimsKeyword() {
+        AbstractWrapper<Article, ?, ?> wrapper =
+                captureWrapperFor(filterQuery(q -> q.setKeyword("  spring  ")));
+
+        assertThat(wrapper.getParamNameValuePairs().values())
+                .as("参数: %s", wrapper.getParamNameValuePairs())
+                .contains("%spring%")
+                .doesNotContain("%  spring  %");
+    }
+
+    @Test
+    @DisplayName("筛选：keyword 里的 LIKE 通配符被转义（搜下划线不能命中全站）")
+    void escapesLikeWildcardsInKeyword() {
+        // 技术博客里搜 user_name / 100% / C++ 是家常便饭。不转义时 _ 匹配任意单字符、
+        // % 匹配任意串，搜一个下划线几乎命中全站文章（规格 §4）。
+        AbstractWrapper<Article, ?, ?> underscore =
+                captureWrapperFor(filterQuery(q -> q.setKeyword("user_name")));
+        assertThat(underscore.getParamNameValuePairs().values())
+                .as("参数: %s", underscore.getParamNameValuePairs())
+                .contains("%user\\_name%");
+
+        AbstractWrapper<Article, ?, ?> percent =
+                captureWrapperFor(filterQuery(q -> q.setKeyword("100%")));
+        assertThat(percent.getParamNameValuePairs().values())
+                .as("参数: %s", percent.getParamNameValuePairs())
+                .contains("%100\\%%");
+    }
+
+    @Test
+    @DisplayName("筛选：keyword 里的反斜杠先于通配符被转义（不能把自己刚写的转义符再转一次）")
+    void escapesBackslashBeforeWildcards() {
+        assertThat(ArticleServiceImpl.escapeLike("a\\b")).isEqualTo("a\\\\b");
+        assertThat(ArticleServiceImpl.escapeLike("_")).isEqualTo("\\_");
+        assertThat(ArticleServiceImpl.escapeLike("%")).isEqualTo("\\%");
+        // 顺序错的典型症状：先把 % 转成 \%，再把 \ 转成 \\，结果变成 \\%，转义失效
+        assertThat(ArticleServiceImpl.escapeLike("a%b")).isEqualTo("a\\%b");
+    }
+
+    @Test
+    @DisplayName("筛选：tagId 用 EXISTS 子查询，且必须显式带 t.deleted = 0")
+    void filtersByTagIdViaExistsWithDeletedGuard() {
+        AbstractWrapper<Article, ?, ?> wrapper =
+                captureWrapperFor(filterQuery(q -> q.setTagId(9L)));
+
+        String sql = wrapper.getTargetSql();
+        assertThat(sql).as("实际 SQL: %s", sql).contains("EXISTS");
+        assertThat(sql).contains("articleTag");
+        // @TableLogic 只保护 MyBatis-Plus 生成的 SQL，手写片段它管不着 ——
+        // 与 CategoryMapper.selectCategoryWithArticleCount 是同一个坑。
+        // 少了这个条件，「正文标签被删掉但文章还在」的关联会让文章错误命中。
+        assertThat(sql).as("EXISTS 里必须显式写 t.deleted = 0，实际 SQL: %s", sql)
+                .contains("deleted");
+        // 参数必须是预编译绑定值，不是拼进 SQL 的字符串
+        assertThat(wrapper.getParamNameValuePairs().values()).contains(9L);
+    }
+
+    @Test
+    @DisplayName("筛选：tagId 为 null 时不加 EXISTS")
+    void skipsTagIdWhenNull() {
+        assertThat(captureWrapperFor(emptyQuery()).getTargetSql()).doesNotContain("EXISTS");
     }
 
     // ---------- VO 转换 ----------
