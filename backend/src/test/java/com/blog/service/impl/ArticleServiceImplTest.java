@@ -2,7 +2,6 @@ package com.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
@@ -212,12 +211,7 @@ class ArticleServiceImplTest {
         Article a = article(7L, "示例文章", 128);
         a.setContent("正文很长很长");   // 不该出现在 VO 上
         a.setDeleted(0);                // 同上
-        given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-            Page<Article> p = invocation.getArgument(0);
-            p.setRecords(List.of(a));
-            p.setTotal(1);
-            return p;
-        });
+        stubPage(List.of(a), 1);
 
         PageResult<ArticleListVO> result = service.list(query(1, 10));
 
