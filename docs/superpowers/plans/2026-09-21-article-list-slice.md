@@ -500,12 +500,7 @@ public class ArticleServiceImpl implements ArticleService {
         Article a = article(7L, "示例文章", 128);
         a.setContent("正文很长很长");   // 不该出现在 VO 上
         a.setDeleted(0);                // 同上
-        given(articleMapper.selectPage(any(), any())).willAnswer(invocation -> {
-            Page<Article> p = invocation.getArgument(0);
-            p.setRecords(List.of(a));
-            p.setTotal(1);
-            return p;
-        });
+        stubPage(List.of(a), 1);        // 复用步骤 1 写好的助手，不要内联 willAnswer 块
 
         PageResult<ArticleListVO> result = service.list(query(1, 10));
 
