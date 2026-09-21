@@ -77,8 +77,11 @@ mysql -u<user> -p < backend/src/main/resources/db/schema.sql
 > **`GET /api/article/list` 的端到端验证尚未完成**：冒烟脚本 `backend/smoke/article-list-smoke.sh`
 > 已就绪但**待手工执行**，且因本切片没有文章写入口，其第二层需要先手工灌入样例数据（脚本末尾附 INSERT）。
 > **建库建表（DDL）与脚本末尾的落库核对由使用者手工执行。**
-> 另有两条要记住的事实：**应用本身从未被启动过**（既没 `spring-boot:run` 过，`docker/` 也还是空的），仓库里**没有 CI**。
-> 所有「绿」都来自单测／切片测试／静态检查。详见 [`docs/ROADMAP.md`](docs/ROADMAP.md) §5。
+> **运行环境已具备：** 后端在 IDE 里跑起来过（`MyBlogApplication`），前端 `npm run dev` 跑过，
+> 本机 MySQL 8 与 Redis 已装好且运行中、库表已建、库里已有数据。
+> 尚未兑现的只有两件：**`article-list-smoke.sh` 从未执行**、**`/category/:id` 从未在浏览器中打开**。
+> 另：`docker/` 仍是空的（部署形态见 [`docs/ROADMAP.md`](docs/ROADMAP.md) §3-A），仓库里**没有 CI**。
+> 详见 [`docs/ROADMAP.md`](docs/ROADMAP.md) §5。
 >
 > **文章列表切片的延后项：** 最终审查判「可合并」后遗留的改进项、以及**已判定不必再提的撤回项**，
 > 统一记在 `docs/superpowers/followups/2026-09-21-article-list-slice-followups.md`。下个切片开工前先读那份，
