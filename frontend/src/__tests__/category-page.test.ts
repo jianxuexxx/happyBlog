@@ -7,7 +7,7 @@ import { defineComponent, h } from 'vue'
 // 翻页用例会因为找不到 .el-pager li 而红——而那是环境问题，不是组件问题。
 import ElementPlus from 'element-plus'
 import Category from '../views/Category.vue'
-import { fetchArticleList, type ArticleListItem } from '../api/article'
+import { fetchArticleList, type ArticleListItem, type PageResult } from '../api/article'
 import { fetchCategoryList } from '../api/category'
 
 // 只桩掉取数函数：组件行为（三态、翻页、路由参数响应）才是被测对象。
@@ -38,6 +38,34 @@ const ROWS: ArticleListItem[] = [
 
 function page(list: ArticleListItem[], total = list.length, pageNo = 1, pageSize = 10) {
   return { total, page: pageNo, pageSize, list }
+}
+
+/** 手动控制解决时机的 promise：用来制造「先发的请求后返回」的乱序。 */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
+/** 用于乱序用例的两份可区分数据；coverImage 取 null，顺带覆盖「后端未设封面」这条真实形态。 */
+const FRESH_ROW: ArticleListItem = {
+  articleId: 7,
+  title: '第一页文章',
+  summary: '摘要一',
+  coverImage: null,
+  createdAt: '2026-09-21T14:30:00',
+  viewCount: 1,
+}
+
+const STALE_ROW: ArticleListItem = {
+  articleId: 99,
+  title: '过期页文章',
+  summary: '摘要九十九',
+  coverImage: null,
+  createdAt: '2026-09-21T14:30:00',
+  viewCount: 1,
 }
 
 const Blank = defineComponent({ render: () => h('div') })
@@ -148,6 +176,47 @@ describe('Category 分类页', () => {
     )
   })
 
+  it('乱序响应：先发的请求后返回时不覆盖后发请求的结果', async () => {
+    // 上面那条链路里两个请求是赛跑的。测试默认让它们按发起顺序返回，于是竞态被掩盖；
+    // 这里刻意让**先发的那个后返回**：没有请求序号守卫时，慢响应会盖掉新结果，
+    // 用户看到的是新分类第 2 页的文章，而 URL 上已经没有 page、分页器高亮第 1 页。
+    mockedArticles.mockResolvedValue(page(ROWS, 50, 2)) // 挂载那次（category 1, page 2）
+    const { wrapper, router } = await mountAt('/category/1?page=2')
+    await flushPromises()
+
+    const stale = deferred<PageResult<ArticleListItem>>() // 先发：categoryId 2, page 2
+    const fresh = deferred<PageResult<ArticleListItem>>() // 后发：categoryId 2, page 1
+    mockedArticles.mockReturnValueOnce(stale.promise)
+    mockedArticles.mockReturnValueOnce(fresh.promise)
+
+    await router.push('/category/2?page=2')
+    await flushPromises()
+    await flushPromises()
+
+    // 前置条件：两个请求确实都已发出且都还悬着（否则本用例根本没测到竞态）。
+    // 同时钉死发起顺序，防止将来 watcher 顺序变化后这里静默测反。
+    expect(mockedArticles).toHaveBeenCalledTimes(3)
+    expect(mockedArticles).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ categoryId: 2, page: 2 }),
+    )
+    expect(mockedArticles).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ categoryId: 2, page: 1 }),
+    )
+
+    fresh.resolve(page([FRESH_ROW], 20, 1)) // 后发的先回
+    await flushPromises()
+    stale.resolve(page([STALE_ROW], 50, 2)) // 先发的后回
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('第一页文章')
+    expect(wrapper.text()).not.toContain('过期页文章')
+    // total 也不能被旧响应改回去（否则页头篇数与分页器页数都会跟着错）
+    expect(wrapper.text()).toContain('共 20 篇')
+    expect(wrapper.text()).not.toContain('共 50 篇')
+  })
+
   it('翻页把页码写进 URL', async () => {
     mockedArticles.mockResolvedValue(page(ROWS, 30, 1))
     const { wrapper, router } = await mountAt('/category/3')
@@ -160,6 +229,23 @@ describe('Category 分类页', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.query.page).toBe('2')
+  })
+
+  it('页码超出末页（当前页为空但 total > 0）时仍渲染分页器', async () => {
+    // 触发路径：手改地址栏 / 旧书签 / 被分享收录的深链打开 ?page=9，而该分类只有 2 页（20 篇）。
+    // 后端只钳下界不钳上界，page=9 原样回显 → records 为空但 total=20。
+    // 分页器若长在「列表非空」的分支里，此时整页没有任何翻页控件，用户回不到第 1 页（死胡同）。
+    mockedArticles.mockResolvedValue(page([], 20, 9))
+    const { wrapper } = await mountAt('/category/3?page=9')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('共 20 篇')
+    expect(wrapper.text()).toContain('暂无文章')
+
+    // 关键断言：空列表时翻页控件仍在，并且给出了回到第 1 页的路
+    const pagerItems = wrapper.findAll('.el-pager li')
+    expect(pagerItems.length).toBeGreaterThan(0)
+    expect(pagerItems.map((li) => li.text())).toContain('1')
   })
 
   it('非法 page 退化为第 1 页', async () => {

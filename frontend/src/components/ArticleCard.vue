@@ -7,9 +7,10 @@
 defineProps<{
   articleId: number
   title: string
-  summary: string
-  /** 封面图路径；空串时走 .img-placeholder 占位（主规格 §14），不报错 */
-  coverImage: string
+  /** 摘要；后端未填时为 null，模板直接插值成空串 */
+  summary: string | null
+  /** 封面图路径；null 或空串时走 .img-placeholder 占位（主规格 §14），不报错 */
+  coverImage: string | null
   /** ISO-8601，如 2026-09-21T14:30:00；卡片只取日期部分 */
   createdAt: string
   viewCount: number

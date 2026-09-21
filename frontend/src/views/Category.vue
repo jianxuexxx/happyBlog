@@ -29,7 +29,17 @@ const loading = ref(true)
 const errorMessage = ref('')
 const categoryName = ref('')
 
+/**
+ * 请求序号守卫。切分类时确定性地会连发两个请求（先「新分类 + 旧页码」，再「新分类 + 第 1 页」），
+ * 两者赛跑：先发的那个若后返回，会把后发请求的结果覆盖掉，用户看到的就是新分类的旧页码那一页，
+ * 而 URL 上已经没有 page、分页器高亮第 1 页、页头篇数还是第 1 页的口径——前后对不上。
+ * 每次调用递增序号，响应回来时若自己已不是最新就整份丢弃（连 loading 一起丢弃，
+ * 否则旧请求会抢先把新请求的加载态关掉）。
+ */
+let requestSeq = 0
+
 async function loadArticles() {
+  const seq = ++requestSeq
   loading.value = true
   errorMessage.value = ''
   try {
@@ -38,14 +48,16 @@ async function loadArticles() {
       page: page.value,
       pageSize: PAGE_SIZE,
     })
+    if (seq !== requestSeq) return
     list.value = result.list
     total.value = result.total
   } catch (err) {
+    if (seq !== requestSeq) return
     errorMessage.value = err instanceof Error ? err.message : '未知错误'
     list.value = []
     total.value = 0
   } finally {
-    loading.value = false
+    if (seq === requestSeq) loading.value = false
   }
 }
 
@@ -107,13 +119,16 @@ function onPageChange(next: number) {
       <button type="button" class="category-retry" @click="loadArticles">重试</button>
     </div>
 
-    <p v-else-if="list.length === 0" class="category-hint">暂无文章</p>
-
     <template v-else>
-      <div class="article-list">
+      <p v-if="list.length === 0" class="category-hint">暂无文章</p>
+
+      <div v-else class="article-list">
         <ArticleCard v-for="item in list" :key="item.articleId" v-bind="item" />
       </div>
 
+      <!-- 分页器**不能**长在「列表非空」分支里：page 超出末页时后端回空 records 但 total 仍 > 0
+           （后端只钳下界不钳上界），那样整页只剩一句「暂无文章」而没有任何翻页控件，
+           用户没有回到第 1 页的路。所以它只依赖 total > 0（出错的 catch 里 total 已归 0）。 -->
       <el-pagination
         v-if="total > 0"
         class="category-pagination"

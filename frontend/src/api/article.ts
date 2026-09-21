@@ -4,9 +4,10 @@ import http, { unwrapResult, type ApiResponse } from './http'
 export interface ArticleListItem {
   articleId: number
   title: string
-  summary: string
-  /** 封面图路径；后端可能返回空串，前端走占位 */
-  coverImage: string
+  /** 摘要；后端未填时为 null（article.summary 允许 NULL，后端 VO 原样透传） */
+  summary: string | null
+  /** 封面图路径；后端未设封面时为 null（article.coverImage 允许 NULL），前端走占位 */
+  coverImage: string | null
   /**
    * ISO-8601，如 2026-09-21T14:30:00。
    * 后端刻意保留 Spring Boot 默认格式（规格 §2）：各 JS 引擎都能正确解析，
@@ -19,7 +20,11 @@ export interface ArticleListItem {
 /** 分页返回体，字段与后端 com.blog.common.PageResult 一一对应 */
 export interface PageResult<T> {
   total: number
-  /** 后端回显的是钳制生效后的值，不是请求值 */
+  /**
+   * 页码回显。注意后端**只钳下界**（小于 1 归 1），**不钳上界**：
+   * 请求 page=9 而该分类只有 2 页时会原样回显 9，此时 list 为空但 total > 0。
+   * 消费方不能假设「list 为空 ⇔ total 为 0」。
+   */
   page: number
   pageSize: number
   list: T[]
