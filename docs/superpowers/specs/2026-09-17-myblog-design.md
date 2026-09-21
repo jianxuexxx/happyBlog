@@ -231,6 +231,12 @@ PUT  /api/admin/site/config          保存站点配置
 | `blog:view:{id}` | 浏览量计数 | 定时写回后清零 |
 | `blog:admin:token` | 管理员会话 | 登出/过期 |
 
+> **注记（2026-09-21，针对上表 `blog:article:list:{hash}` 一行）：** 该键 **暂缓实现**。它是参数组合
+> （`categoryId`/`tagId`/`keyword`/`recommended`/`top` × `page`/`pageSize`），失效需靠
+> `SCAN MATCH` 或维护键索引，复杂度与个人博客的收益不成比例；列表里的 `viewCount`
+> 来自 MySQL 定时落库，缓存只会让它更旧。待管理端 article CRUD 落地、有了真实写入压力后重新评估。
+> 详见 [2026-09-21-article-list-slice-design.md](./2026-09-21-article-list-slice-design.md) §9。
+
 ## 10. 错误处理
 
 - 全局 `@RestControllerAdvice`，分两层：
@@ -289,8 +295,8 @@ PUT  /api/admin/site/config          保存站点配置
 1. Docker 基础设施与初始化（MySQL/Redis/RustFS）
 2. 后端骨架（Spring Boot + MyBatis-Plus + 公共字段/逻辑删除/统一返回/全局异常）✅（2026-09-20 完成，含极简 JWT 鉴权与 OpenAPI 配置就绪；导出需运行应用）
 3. 数据模型与基础 CRUD（分类/标签/文章）—— 全部 7 张表的 DDL/实体/Mapper 已就位；`category` 一条 CRUD 的代码路径已完成并测试覆盖，端到端已按 `backend/smoke/category-smoke.sh` 真实跑通（22/22，含真库写入、缓存失效与自排除谓词断言），其余表待实现
-4. 前台核心接口 + 缓存/浏览量 —— 进行中：`GET /api/category/list`（含 `blog:category:list` 缓存，TTL 5 分钟，写操作失效）已就位；文章列表/详情与浏览量统计待实现
+4. 前台核心接口 + 缓存/浏览量 —— 进行中：`GET /api/category/list`（含 `blog:category:list` 缓存，TTL 5 分钟，写操作失效）与 `GET /api/article/list`（含 categoryId/tagId/keyword/recommended/top 全部筛选与分页，**不带缓存**，见下方 §9 注记）已就位；文章详情与浏览量统计待实现
 5. 前端骨架（Vue3 + 主题系统 + 路由）✅（2026-09-17 完成）
-6. 前台页面（首页/列表/详情/归档/搜索/友链/关于）—— 进行中（2026-09-20）：首页侧栏「分类」卡片已接 `GET /api/category/list`（前端首条真实数据链路）；`/category/:id` 等其余页面仍为占位
+6. 前台页面（首页/列表/详情/归档/搜索/友链/关于）—— 进行中：首页侧栏「分类」卡片与 `/category/:id` 分类页已接真实数据；`/tag/:id`、`/archive`、`/search`、`/friends`、`/about`、`/article/:articleId` 仍为占位
 7. 管理端（登录/文章/Vditor/图床/分类标签/友链/配置/仪表盘）
 8. 联调 + Docker Compose 编排与测试

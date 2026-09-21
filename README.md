@@ -45,7 +45,7 @@ JAVA_HOME=/e/works/jdk21 PATH=/e/works/jdk21/bin:$PATH \
 cd frontend
 npm install
 npm run dev
-npm run test        # vitest（jsdom），4 个文件 / 15 个用例
+npm run test        # vitest（jsdom），6 个文件 / 32 个用例
 npx vue-tsc -b      # 类型检查
 ```
 
@@ -61,14 +61,23 @@ mysql -u<user> -p < backend/src/main/resources/db/schema.sql
 
 `backend/smoke/category-smoke.sh` 是 category 竖切链路的端到端冒烟脚本（自带 `admin` 凭据），需后端与 Redis 已启动。
 
+`backend/smoke/article-list-smoke.sh` 是 `GET /api/article/list` 的冒烟脚本（无需凭据，纯公开接口）。它分两层：第一层空库即可跑；第二层需先手工执行脚本末尾的样例数据 INSERT，跑完再执行末尾的清理 SQL。
+
 ## 状态
 
 > **已完成：** 前端骨架（主题/路由/布局/首页 v2）与后端骨架（Spring Boot 3 + 公共基建 + JWT 鉴权 + category 竖切链路）。
 >
-> **前端已接上首条真实数据链路（2026-09-20）：** 首页侧栏「分类」卡片读 `GET /api/category/list`，浏览器实测能渲染真库数据（空库显示「暂无分类」），点击进入 `/category/:id`。
+> **前端已接上两条真实数据链路：** 首页侧栏「分类」卡片读 `GET /api/category/list`（2026-09-20，
+> 浏览器实测能渲染真库数据，空库显示「暂无分类」）；`/category/:id` 分类页读
+> `GET /api/article/list`（2026-09-21，含分页与 URL 页码，空态显示「暂无文章」）。
+> **该页面尚未在浏览器中实测** —— 接口与接线已完成，真实渲染效果待人工验证后再写进本节。
 >
-> **验证边界：** 编译、Mockito 单测、MockMvc 切片由开发侧负责；category 竖切链路另经 `backend/smoke/category-smoke.sh` 真实 HTTP 跑通（22/22，含真库写入与缓存失效断言）。**建库建表（DDL）与脚本末尾的落库核对由使用者手工执行。**
+> **验证边界：** 编译、Mockito 单测、MockMvc 切片、前端 vitest 与 `vue-tsc` 类型检查由开发侧负责；
+> category 竖切链路另经 `backend/smoke/category-smoke.sh` 真实 HTTP 跑通。
+> **`GET /api/article/list` 的端到端验证尚未完成**：冒烟脚本 `backend/smoke/article-list-smoke.sh`
+> 已就绪但**待手工执行**，且因本切片没有文章写入口，其第二层需要先手工灌入样例数据（脚本末尾附 INSERT）。
+> **建库建表（DDL）与脚本末尾的落库核对由使用者手工执行。**
 >
-> **下一步：** `GET /api/article/list?categoryId=`（`/category/:id` 目前仍是占位页），其余业务表的 CRUD、前台接口与浏览量统计、管理端页面、RustFS 上传、Docker Compose 编排。
+> **下一步：** `/tag/:id`、`/article/:articleId`、`/archive`、`/search`、`/friends`、`/about` 仍为占位页；其余业务表的 CRUD、浏览量统计、管理端页面、RustFS 上传、Docker Compose 编排。
 >
 > **已知未修（用户 2026-09-20 裁定暂不动）：** 暗色主题刷新后不生效 —— `frontend/src/store/theme.ts` 的 `init()` 没有调用点，localStorage 里的暗色偏好在刷新后不会打到 `:root` 上（表现为图标显示「暗色」而页面是亮的），点一次切换按钮才生效。

@@ -47,8 +47,10 @@ public class ArticleServiceImpl implements ArticleService {
 
         IPage<Article> result = articleMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
 
-        // 回显钳制后的值，不是请求值：回显原值会让前端页码控件按请求值排页，
+        // 回显的是 normalize 之后的值，不是请求原值：回显原值会让前端页码控件按请求值排页，
         // 与实际返回的条数对不上（设计规格 §3）。
+        // 注意这个说法的边界：pageSize 是双向钳制到 [1, 50]，而 page 只钳下界
+        // （page < 1 → 1），上界不钳 —— page=9 会原样回显。别把它读成「page 的上界也被钳了」。
         return PageResult.of(result.getTotal(), pageNum, pageSize, toVoList(result.getRecords()));
     }
 

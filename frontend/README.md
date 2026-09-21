@@ -41,6 +41,21 @@ src/
 
 **2. `40100`（token 失效）在 axios 的*成功*回调里处理**（见 `api/http.ts` 的响应拦截器）：清掉 localStorage 里的 `blog-admin-token`，然后照常把响应交回调用方。这是契约 1 的直接后果。
 
+## 已接入的后端接口
+
+| 前端调用 | 后端接口 | 说明 |
+|---|---|---|
+| `fetchCategoryList()` | `GET /api/category/list` | 首页侧栏分类卡片、分类页的页头标题 |
+| `fetchArticleList(query)` | `GET /api/article/list` | 分类页文章列表 |
+
+`fetchArticleList` 的返回是 `PageResult<T>`：`{ total, page, pageSize, list }`，字段与后端
+`com.blog.common.PageResult` 一一对应。**响应里的 `page` / `pageSize` 是后端钳制生效后的值**
+（请求 `pageSize=999` 会得到 `50`），不是请求值的回显。
+
+`createdAt` 是 ISO-8601（`2026-09-21T14:30:00`）。后端刻意不定制时间格式（理由见
+`docs/superpowers/specs/2026-09-21-article-list-slice-design.md` §2），因为它同时是
+`new Date()` 在各浏览器上都能正确解析的格式。只显示日期时用 `createdAt.slice(0, 10)`。
+
 ## 主题
 
 设计令牌集中在 `styles/tokens.css`，暗色是 `:root.dark` 覆盖同名变量，由 `store/theme.ts` 切换 `document.documentElement` 上的 `dark` 类，偏好存 localStorage 的 `blog-theme`。

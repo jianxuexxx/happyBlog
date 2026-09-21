@@ -142,7 +142,14 @@ ORDER BY isTop DESC, createdAt DESC, articleId DESC
 - `categoryId=abc`（类型不匹配）→ 由既有 `GlobalExceptionHandler` 映射为 `40001`，**不新增错误码**
 - **本次不新增任何 `ResultCode`**
 
-> **规划期发现的待验证点（任务 3 会先撞上）**：`@ModelAttribute` 绑定失败时，Spring MVC 抛的是 `MethodArgumentNotValidException` 还是 `BindException`，**随版本而异**；`GlobalExceptionHandler` 目前只注册了前者。若实测落到 `BindException`，它会被 catch-all 兜成 `50000`——那正是主规格 §10 点名要避免的「客户端错误被误报成服务器故障」。届时须补一个 `BindException` 的 handler。任务 3 的测试先按 `40001` 写，跑出来的真实结果决定是否补。
+> **该待验证点已实测结清（2026-09-21，任务 3）**：`@ModelAttribute` 绑定失败时，本项目当前
+> 的 Spring Boot 版本抛的是 `MethodArgumentNotValidException` —— 既有
+> `GlobalExceptionHandler.handleValidation` 已映射它。故 **`categoryId` 类型失配实测返回
+> `40001`**，未新增任何 handler，`GlobalExceptionHandler.java` 未被改动。
+>
+> 口径边界（勿写成更强的结论）：以上只是 `categoryId` 一处的实测结果。`page=abc` 等其它参数的
+> 类型失配**未单独实测**；若要把结论推广成「所有参数类型失配均为 40001」，那是基于
+> 「同 POJO、同绑定器」的外推，须显式标注为外推，或先补一条 `page=abc` 的用例把它变成实测。
 
 ## 4. 查询实现
 
